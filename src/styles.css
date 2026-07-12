@@ -87,18 +87,21 @@ body {
   right: 0;
   bottom: 0;
   z-index: 50;
-  background: var(--panel);
-  border-top: 2px solid var(--border);
-  padding: 6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom))
-    calc(6px + env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.14);
+  padding: 8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom))
+    calc(8px + env(safe-area-inset-left));
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
 .pad-row {
   display: flex;
-  gap: 5px;
+  gap: 6px;
   justify-content: center;
 }
 
@@ -106,9 +109,12 @@ body {
   flex: 1;
   min-width: 0;
   max-width: 72px;
-  padding: 8px 0;
-  font-size: 16px;
-  border-radius: 8px;
+  height: 44px;
+  padding: 0;
+  font-size: 15px;
+  border: none;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -116,21 +122,65 @@ body {
   user-select: none;
 }
 
-.pad-btn.active {
-  outline: 3px solid var(--accent);
-  outline-offset: -2px;
+.pad-btn:active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.pad-btn .note {
+.pad-btn:disabled {
+  opacity: 0.35;
+}
+
+.pad-btn.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* パッド内のノーツはリング装飾を外してフラットに（大ノーツはひと回り大きく） */
+.mobile-pad .note {
   width: 24px;
   height: 24px;
-  font-size: 12px;
+  font-size: 11px;
+  box-shadow: none;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  outline: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.mobile-pad .note.n3,
+.mobile-pad .note.n4,
+.mobile-pad .note.n6 {
+  width: 30px;
+  height: 30px;
+  font-size: 13px;
 }
 
 .pad-unit {
   flex: 1.4;
-  max-width: 90px;
+  max-width: 92px;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  text-align: center;
+  font-weight: bold;
   touch-action: manipulation;
+}
+
+/* ==== 折りたたみパネル（スマホ版） ==== */
+.collapsible summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--muted);
+  padding: 2px 0;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.collapsible[open] summary {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+  color: var(--text);
 }
 
 h1 {
@@ -974,6 +1024,79 @@ label.inline {
 
 .mode-mobile .app-footer {
   display: none; /* キーボード操作の説明はスマホ版では不要 */
+}
+
+/* スマホ版はヘッダ・ツールバーをコンパクトにしてすっきり見せる */
+.mode-mobile.app {
+  padding-top: 6px;
+}
+
+.mode-mobile .app-header {
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.mode-mobile .app-header h1 {
+  font-size: 15px;
+  width: 100%;
+  text-align: center;
+}
+
+.mode-mobile .tab-bar {
+  flex: 1;
+  justify-content: center;
+}
+
+.mode-mobile .tab-bar .tab {
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.mode-mobile .header-buttons {
+  gap: 5px;
+  flex: 1;
+  justify-content: center;
+}
+
+.mode-mobile .header-buttons button {
+  padding: 5px 8px;
+  font-size: 11px;
+  border-radius: 8px;
+}
+
+.mode-mobile .transport {
+  gap: 5px;
+}
+
+.mode-mobile .transport button {
+  padding: 6px 9px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.mode-mobile .time-display {
+  font-size: 11px;
+}
+
+.mode-mobile .selection-tools {
+  font-size: 11px;
+  gap: 5px;
+}
+
+.mode-mobile .panel {
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+
+.mode-mobile .play-controls button {
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+.mode-mobile .measure-header {
+  flex-wrap: wrap;
+  row-gap: 2px;
 }
 
 /* ==== モード選択画面 ==== */

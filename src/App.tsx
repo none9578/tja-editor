@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Measure, Metadata, NoteValue, Project } from './types';
 import { cloneMeasure, createMeasure, createProject, normalizeProject, uid } from './project';
 import { chartToAudio, computeTimings, totalDuration } from './utils/timing';
@@ -57,6 +57,32 @@ function loadSavedProject(): Project | null {
 function loadCalibration(): number {
   const v = Number(localStorage.getItem(CALIBRATION_KEY));
   return Number.isFinite(v) ? v : 0;
+}
+
+/** PC=常時表示のパネル、スマホ=折りたたみ式（タップで開閉）にして省スペース化 */
+function PanelSection({
+  title,
+  mobile,
+  children,
+}: {
+  title: string;
+  mobile: boolean;
+  children: ReactNode;
+}) {
+  if (mobile) {
+    return (
+      <details className="panel collapsible">
+        <summary>{title}</summary>
+        {children}
+      </details>
+    );
+  }
+  return (
+    <section className="panel">
+      <h2>{title}</h2>
+      {children}
+    </section>
+  );
 }
 
 const HIT_TYPE: Partial<Record<NoteValue, HitType>> = {
@@ -143,11 +169,8 @@ export default function App() {
     return events;
   }, [project, timings, rollSpans, timeAt]);
 
-  // プレイ画面では自動ヒット音を止める（プレイヤー自身の入力音のみ）
-  const playerEvents = tab === 'play' ? [] : autoEvents;
-
   // 再生同期は「OFFSET + 環境補正」で行う（補正はTJAに出力しない）
-  const player = usePlayer(project.metadata.offset + calibration, playerEvents, chartEnd);
+  const player = usePlayer(project.metadata.offset + calibration, autoEvents, chartEnd);
   const playerRef = useRef(player);
   playerRef.current = player;
 
@@ -634,7 +657,7 @@ export default function App() {
             className={tab === 'play' ? 'tab active' : 'tab'}
             onClick={() => switchTab('play')}
           >
-            🥁 プレイ
+            🥁 オート再生
           </button>
         </nav>
         <div className="header-buttons">
@@ -660,16 +683,14 @@ export default function App() {
 
       {tab === 'edit' && (
         <div className="top-panels">
-          <section className="panel">
-            <h2>曲情報（TJAメタデータ）</h2>
+          <PanelSection title="曲情報（TJAメタデータ）" mobile={isMobile}>
             <MetadataForm
               metadata={project.metadata}
               balloonNoteCount={stats.balloonCount}
               onChange={updateMetadata}
             />
-          </section>
-          <section className="panel">
-            <h2>音源</h2>
+          </PanelSection>
+          <PanelSection title="音源・オフセット調整" mobile={isMobile}>
             <AudioPanel
               audioInfo={player.audioInfo}
               hitSoundOn={player.hitSoundOn}
@@ -681,14 +702,14 @@ export default function App() {
               onToggleHitSound={player.setHitSoundOn}
               onChangeVolume={player.changeMusicVolume}
             />
-            <h2>オフセット調整</h2>
+            {!isMobile && <h2>オフセット調整</h2>}
             <OffsetPanel
               offset={project.metadata.offset}
               onChange={(v) => updateMetadata({ offset: v })}
               calibration={calibration}
               onCalibrationChange={setCalibration}
             />
-          </section>
+          </PanelSection>
         </div>
       )}
 
@@ -859,6 +880,7 @@ export default function App() {
             chartEnd={chartEnd}
             playFromMeasure={playFromMeasure}
             onChangePlayFrom={setPlayFromMeasure}
+            events={autoEvents}
           />
         </section>
       )}

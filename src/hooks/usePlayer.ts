@@ -16,72 +16,56 @@ export interface AudioInfo {
 /** usePlayerの戻り値の型（コンポーネントのprops用） */
 export type Player = ReturnType<typeof usePlayer>;
 
-interface InternalState {
-  /** 再生開始した譜面時刻（停止で戻る位置） */
-  startChart: number;
-  /** perf時計の基準（音源が主導していないときに使用） */
-  baseChart: number;
-  basePerf: number;
-  /** 音源の状態: waiting=負の音源時刻を待機中 / playing / done=音源範囲外 */
-  audioState: 'none' | 'waiting' | 'playing' | 'done';
-  noteIdx: number;
-  raf: number;
-  /** rAFが止まる環境（非表示タブ等）向けのフォールバックタイマー */
-  interval: number;
-  lastTick: number;
-}
-
 /**
- * 音源＋ノーツ音の再生エンジン。
- * 同期の考え方は utils/timing.ts のコメント参照:
- *   audioTime = chartTime - offset
- * 音源が再生中は audio.currentTime を正として譜面位置バーを動かし、
- * 音源開始前（audioTime < 0 の区間）や音源なしのときは performance.now() 時計で進める。
+ * 再生エンジン（理論ミックス方式）。
+ *
+ * 再生開始のたびに、音源とすべてのノーツ音を同一のAudioContextクロック上へ
+ * サンプル精度で事前スケジュールする。ミックスはオーディオスレッドが行うため、
+ * rAF・タイマー・タブの状態などJavaScript側の揺れは音のタイミングに一切影響しない
+ * （スマホでも安定する）。rAFは再生位置バーの表示更新にだけ使う。
+ *
+ * 同期式は utils/timing.ts 参照: audioTime = chartTime - offset
  */
 export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: number) {
   const [audioInfo, setAudioInfo] = useState<AudioInfo | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playhead, setPlayheadState] = useState(0); // 譜面時刻
-  /** Reactの再描画を待たずに最新の譜面時刻を読むためのref（プレイ画面のcanvas用） */
+  /** Reactの再描画を待たずに最新の譜面時刻を読むためのref（canvas描画用） */
   const playheadRef = useRef(0);
-  const setPlayhead = useCallback((t: number) => {
-    playheadRef.current = t;
-    setPlayheadState(t);
-  }, []);
-  const [hitSoundOn, setHitSoundOn] = useState(true);
+  const [hitSoundOn, setHitSoundOnState] = useState(true);
   // デフォルトは曲を控えめ・太鼓音を大きめにしてズレ確認しやすくする
-  const [musicVolume, setMusicVolume] = useState(0.5);
+  const [musicVolume, setMusicVolumeState] = useState(0.5);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const urlRef = useRef<string | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const buffersRef = useRef<{ don: AudioBuffer | null; ka: AudioBuffer | null }>({
     don: null,
     ka: null,
   });
+  const musicBufRef = useRef<AudioBuffer | null>(null);
+  const musicGainRef = useRef<GainNode | null>(null);
+  const hitGainRef = useRef<GainNode | null>(null);
+  const sourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const anchorRef = useRef({ chart: 0, ctxTime: 0 });
+  const startChartRef = useRef(0);
+  const tickerRef = useRef({ raf: 0, interval: 0 });
+  const isPlayingRef = useRef(false);
 
   const offsetRef = useRef(offset);
-  offsetRef.current = offset;
   const eventsRef = useRef(noteEvents);
   eventsRef.current = noteEvents;
   const chartEndRef = useRef(chartEnd);
   chartEndRef.current = chartEnd;
   const hitOnRef = useRef(hitSoundOn);
-  hitOnRef.current = hitSoundOn;
+  const musicVolRef = useRef(musicVolume);
 
-  const stRef = useRef<InternalState>({
-    startChart: 0,
-    baseChart: 0,
-    basePerf: 0,
-    audioState: 'none',
-    noteIdx: 0,
-    raf: 0,
-    interval: 0,
-    lastTick: 0,
-  });
+  const setPlayhead = useCallback((t: number) => {
+    playheadRef.current = t;
+    setPlayheadState(t);
+  }, []);
 
   const ensureCtx = useCallback(() => {
-    if (!ctxRef.current) {
+    // close済み（StrictModeの二重マウント等）のコンテキストは作り直す
+    if (!ctxRef.current || ctxRef.current.state === 'closed') {
       ctxRef.current = new AudioContext();
       // ドン・カッのヒット音を読み込む（public/sounds/ に同梱）
       const load = async (path: string): Promise<AudioBuffer | null> => {
@@ -100,200 +84,215 @@ export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: num
     return ctxRef.current;
   }, []);
 
-  const playHit = useCallback((type: HitType) => {
-    const ctx = ensureCtx();
-    const buf =
-      type === 'don' || type === 'bigDon' ? buffersRef.current.don : buffersRef.current.ka;
-    if (!buf) return;
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const gain = ctx.createGain();
-    gain.gain.value = type === 'bigDon' || type === 'bigKa' ? 1.25 : 1;
-    src.connect(gain).connect(ctx.destination);
-    src.start();
+  // 初回マウント時にヒット音の読み込みを始めておく（最初の再生から鳴らすため）
+  useEffect(() => {
+    ensureCtx();
   }, [ensureCtx]);
 
-  const stopRaf = useCallback(() => {
-    if (stRef.current.raf) cancelAnimationFrame(stRef.current.raf);
-    stRef.current.raf = 0;
-    if (stRef.current.interval) clearInterval(stRef.current.interval);
-    stRef.current.interval = 0;
+  const stopSources = useCallback(() => {
+    for (const s of sourcesRef.current) {
+      try {
+        s.stop();
+      } catch {
+        /* 未開始・停止済みは無視 */
+      }
+    }
+    sourcesRef.current = [];
   }, []);
 
-  /** 1フレーム分の同期処理。trueを返したら再生終了 */
+  const stopTicker = useCallback(() => {
+    if (tickerRef.current.raf) cancelAnimationFrame(tickerRef.current.raf);
+    if (tickerRef.current.interval) clearInterval(tickerRef.current.interval);
+    tickerRef.current.raf = 0;
+    tickerRef.current.interval = 0;
+  }, []);
+
+  /** 現在の譜面時刻（オーディオクロック基準） */
+  const currentChart = useCallback(() => {
+    const ctx = ctxRef.current;
+    if (!ctx) return playheadRef.current;
+    return anchorRef.current.chart + (ctx.currentTime - anchorRef.current.ctxTime);
+  }, []);
+
+  /** 表示更新1回ぶん。trueで再生終了 */
   const tick = useCallback((): boolean => {
-    const st = stRef.current;
-    st.lastTick = performance.now();
-    const audio = audioRef.current;
-    const off = offsetRef.current;
-    let chart: number;
-
-    if (audio && st.audioState === 'playing' && !audio.paused && !audio.ended) {
-      // 音源再生中は音源時刻を正とする（ドリフト防止）
-      chart = audio.currentTime + off;
-      st.baseChart = chart;
-      st.basePerf = performance.now();
-    } else {
-      chart = st.baseChart + (performance.now() - st.basePerf) / 1000;
-      if (audio && st.audioState === 'waiting') {
-        const audioTime = chart - off;
-        if (audioTime >= 0) {
-          if (audioTime < audio.duration) {
-            audio.currentTime = audioTime;
-            void audio.play();
-            st.audioState = 'playing';
-          } else {
-            st.audioState = 'done';
-          }
-        }
-      }
-      if (audio && st.audioState === 'playing' && audio.ended) {
-        st.audioState = 'done';
-      }
-    }
-
-    // ヒット音: 前フレームから今フレームまでに通過したノーツを鳴らす
-    const events = eventsRef.current;
-    while (st.noteIdx < events.length && events[st.noteIdx].time <= chart) {
-      if (hitOnRef.current) playHit(events[st.noteIdx].type);
-      st.noteIdx += 1;
-    }
-
+    const chart = currentChart();
     setPlayhead(chart);
-
-    const audioDone =
-      !audio || st.audioState === 'done' || st.audioState === 'none' || audio.ended;
-    if (chart > chartEndRef.current + 0.5 && audioDone) {
-      // 終端に達したら停止（位置は終端に置く）
-      audio?.pause();
-      stopRaf();
+    const musicEndChart = musicBufRef.current
+      ? musicBufRef.current.duration + offsetRef.current
+      : 0;
+    const end = Math.max(chartEndRef.current, musicEndChart);
+    if (chart > end + 0.3) {
+      stopSources();
+      stopTicker();
+      isPlayingRef.current = false;
       setIsPlaying(false);
-      setPlayhead(chartEndRef.current);
+      setPlayhead(end);
       return true;
     }
     return false;
-  }, [playHit, stopRaf]);
+  }, [currentChart, setPlayhead, stopSources, stopTicker]);
 
-  const loop = useCallback(() => {
-    if (!tick()) stRef.current.raf = requestAnimationFrame(loop);
-  }, [tick]);
+  const startTicker = useCallback(() => {
+    stopTicker();
+    const loop = () => {
+      if (!tick()) tickerRef.current.raf = requestAnimationFrame(loop);
+    };
+    tickerRef.current.raf = requestAnimationFrame(loop);
+    // 非表示タブではrAFが止まるため低頻度のフォールバックを併用（音は影響を受けない）
+    tickerRef.current.interval = window.setInterval(() => {
+      if (isPlayingRef.current) tick();
+    }, 250);
+  }, [stopTicker, tick]);
 
-  /** rAF・intervalの二重駆動を開始する（intervalは非表示タブ対策） */
-  const startTicking = useCallback(() => {
-    const st = stRef.current;
-    st.lastTick = performance.now();
-    st.raf = requestAnimationFrame(loop);
-    st.interval = window.setInterval(() => {
-      // rAFが直近で動いていれば何もしない
-      if (performance.now() - stRef.current.lastTick > 90) tick();
-    }, 100);
-  }, [loop, tick]);
-
-  /** 指定の譜面時刻から再生を開始する */
+  /**
+   * 指定の譜面時刻から再生する。
+   * 音源と全ノーツ音をこの場で一括スケジュール（=理論的にミックス）する。
+   */
   const play = useCallback(
     (fromChart: number) => {
-      ensureCtx();
-      stopRaf();
-      const st = stRef.current;
-      const audio = audioRef.current;
-      st.startChart = fromChart;
-      st.baseChart = fromChart;
-      st.basePerf = performance.now();
-      const events = eventsRef.current;
-      st.noteIdx = events.findIndex((e) => e.time >= fromChart - 1e-4);
-      if (st.noteIdx < 0) st.noteIdx = events.length;
+      const ctx = ensureCtx();
+      stopSources();
 
-      if (audio) {
-        audio.pause();
-        const audioTime = fromChart - offsetRef.current; // 同期補正
-        if (audioTime >= 0 && audioTime < audio.duration) {
-          audio.currentTime = audioTime;
-          void audio.play();
-          st.audioState = 'playing';
-        } else if (audioTime < 0) {
-          audio.currentTime = 0;
-          st.audioState = 'waiting';
-        } else {
-          st.audioState = 'done';
+      const t0 = ctx.currentTime + 0.08; // スケジューリング余裕
+      anchorRef.current = { chart: fromChart, ctxTime: t0 };
+      startChartRef.current = fromChart;
+
+      // 曲（音量は再生中もmusicGainで変えられる）
+      const musicGain = ctx.createGain();
+      musicGain.gain.value = musicVolRef.current;
+      musicGain.connect(ctx.destination);
+      musicGainRef.current = musicGain;
+      const music = musicBufRef.current;
+      if (music) {
+        const fromAudio = fromChart - offsetRef.current; // 同期補正
+        if (fromAudio < music.duration) {
+          const src = ctx.createBufferSource();
+          src.buffer = music;
+          src.connect(musicGain);
+          if (fromAudio >= 0) src.start(t0, fromAudio);
+          else src.start(t0 - fromAudio, 0); // 助走中は待ってから頭出し
+          sourcesRef.current.push(src);
         }
-      } else {
-        st.audioState = 'none';
       }
+
+      // ノーツ音（ON/OFFは再生中もhitGainで切り替えられる）
+      const hitGain = ctx.createGain();
+      hitGain.gain.value = hitOnRef.current ? 1 : 0;
+      hitGain.connect(ctx.destination);
+      hitGainRef.current = hitGain;
+      for (const e of eventsRef.current) {
+        if (e.time < fromChart - 1e-4) continue;
+        const buf =
+          e.type === 'don' || e.type === 'bigDon' ? buffersRef.current.don : buffersRef.current.ka;
+        if (!buf) continue;
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const g = ctx.createGain();
+        g.gain.value = e.type === 'bigDon' || e.type === 'bigKa' ? 1.25 : 1;
+        src.connect(g).connect(hitGain);
+        src.start(t0 + (e.time - fromChart));
+        sourcesRef.current.push(src);
+      }
+
+      isPlayingRef.current = true;
       setIsPlaying(true);
       setPlayhead(fromChart);
-      startTicking();
+      startTicker();
     },
-    [ensureCtx, startTicking, stopRaf],
+    [ensureCtx, stopSources, setPlayhead, startTicker],
   );
 
   const pause = useCallback(() => {
-    audioRef.current?.pause();
-    stopRaf();
+    if (isPlayingRef.current) setPlayhead(currentChart());
+    stopSources();
+    stopTicker();
+    isPlayingRef.current = false;
     setIsPlaying(false);
-  }, [stopRaf]);
+  }, [currentChart, setPlayhead, stopSources, stopTicker]);
 
   /** 停止: 再生開始位置に戻す */
   const stop = useCallback(() => {
-    audioRef.current?.pause();
-    stopRaf();
+    stopSources();
+    stopTicker();
+    isPlayingRef.current = false;
     setIsPlaying(false);
-    setPlayhead(stRef.current.startChart);
-    stRef.current.baseChart = stRef.current.startChart;
-  }, [stopRaf]);
+    setPlayhead(startChartRef.current);
+  }, [setPlayhead, stopSources, stopTicker]);
 
   /** 一時停止中の位置移動 / 再生中のシーク */
   const seek = useCallback(
     (chart: number) => {
-      if (isPlaying) {
+      if (isPlayingRef.current) {
         play(chart);
       } else {
-        stRef.current.baseChart = chart;
-        stRef.current.startChart = chart;
+        startChartRef.current = chart;
         setPlayhead(chart);
       }
     },
-    [isPlaying, play],
+    [play, setPlayhead],
   );
+
+  // OFFSET・環境補正・譜面が変わったら、再生中なら現在位置から組み直す
+  // （調整ボタンを押した結果がすぐ音に反映される）
+  offsetRef.current = offset;
+  useEffect(() => {
+    if (isPlayingRef.current) play(playheadRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offset, noteEvents]);
 
   const loadAudioFile = useCallback(
     (file: File) => {
       pause();
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-      const url = URL.createObjectURL(file);
-      urlRef.current = url;
-      const el = new Audio(url);
-      el.preload = 'auto';
-      el.volume = musicVolume;
-      el.addEventListener('loadedmetadata', () => {
-        setAudioInfo({ name: file.name, duration: el.duration });
-      });
-      el.addEventListener('error', () => {
-        setAudioInfo(null);
-        audioRef.current = null;
-      });
-      audioRef.current = el;
+      const ctx = ensureCtx();
+      void file
+        .arrayBuffer()
+        .then((buf) => ctx.decodeAudioData(buf))
+        .then((decoded) => {
+          musicBufRef.current = decoded;
+          setAudioInfo({ name: file.name, duration: decoded.duration });
+        })
+        .catch(() => {
+          musicBufRef.current = null;
+          setAudioInfo(null);
+        });
     },
-    [pause, musicVolume],
+    [ensureCtx, pause],
   );
 
+  const setHitSoundOn = useCallback((on: boolean) => {
+    setHitSoundOnState(on);
+    hitOnRef.current = on;
+    if (hitGainRef.current) hitGainRef.current.gain.value = on ? 1 : 0;
+  }, []);
+
   const changeMusicVolume = useCallback((v: number) => {
-    setMusicVolume(v);
-    if (audioRef.current) audioRef.current.volume = v;
+    setMusicVolumeState(v);
+    musicVolRef.current = v;
+    if (musicGainRef.current) musicGainRef.current.gain.value = v;
   }, []);
 
   /** パレットのボタン押下などで単発のヒット音を鳴らす */
   const preview = useCallback(
     (type: HitType) => {
-      playHit(type);
+      const ctx = ensureCtx();
+      const buf =
+        type === 'don' || type === 'bigDon' ? buffersRef.current.don : buffersRef.current.ka;
+      if (!buf) return;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const g = ctx.createGain();
+      g.gain.value = type === 'bigDon' || type === 'bigKa' ? 1.25 : 1;
+      src.connect(g).connect(ctx.destination);
+      src.start();
     },
-    [playHit],
+    [ensureCtx],
   );
 
   useEffect(() => {
     return () => {
-      stopRaf();
-      audioRef.current?.pause();
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      stopSources();
+      stopTicker();
       void ctxRef.current?.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
