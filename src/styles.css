@@ -1,0 +1,1080 @@
+/* ==== テーマ変数 ==== */
+:root,
+:root[data-theme='light'] {
+  --bg: #f5f3ee;
+  --panel: #ffffff;
+  --text: #2b2620;
+  --muted: #7a7466;
+  --border: #d8d2c4;
+  --accent: #c8542c;
+  --accent-text: #ffffff;
+  --slot-bg: #fbfaf6;
+  --slot-beat: #b8b09e;
+  --slot-line: #e6e0d2;
+  --selected: #fff3d6;
+  --playbar: #e0342a;
+  --don: #e0452a;
+  --ka: #2a7fc4;
+  --roll: #e6b422;
+  --balloon: #f08830;
+  --end: #999283;
+  --error: #c0392b;
+  --warning: #b07d18;
+  --ok: #2e7d32;
+}
+
+:root[data-theme='dark'] {
+  --bg: #1d1b17;
+  --panel: #2a2722;
+  --text: #ece7db;
+  --muted: #a39a88;
+  --border: #454036;
+  --accent: #e06a3c;
+  --accent-text: #ffffff;
+  --slot-bg: #232019;
+  --slot-beat: #6e6653;
+  --slot-line: #3a362c;
+  --selected: #4a4028;
+  --playbar: #ff5346;
+  --don: #ff6b4a;
+  --ka: #4da3e8;
+  --roll: #ffd23f;
+  --balloon: #ffa04d;
+  --end: #8d8676;
+  --error: #ff7b6b;
+  --warning: #e8b84a;
+  --ok: #7bc47f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* iOSのタップ時のグレーのハイライトを消す */
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', Meiryo, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  /* iOSスタンドアロン表示のノッチ・ホームバーを避ける */
+  padding: 12px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom))
+    calc(16px + env(safe-area-inset-left));
+}
+
+/* タッチ端末: フォーカス時のiOS自動ズームを防ぐ（16px未満だと拡大される） */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* ==== スマホ用入力パッド ==== */
+.mobile-pad {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  background: var(--panel);
+  border-top: 2px solid var(--border);
+  padding: 6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom))
+    calc(6px + env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pad-row {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+.pad-btn {
+  flex: 1;
+  min-width: 0;
+  max-width: 72px;
+  padding: 8px 0;
+  font-size: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.pad-btn.active {
+  outline: 3px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.pad-btn .note {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+
+.pad-unit {
+  flex: 1.4;
+  max-width: 90px;
+  touch-action: manipulation;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+h2 {
+  font-size: 14px;
+  margin: 0 0 8px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+button {
+  font: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: bold;
+}
+
+button.mini {
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+button.danger {
+  color: var(--error);
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* ==== ヘッダ（常時表示） ==== */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.tab-bar {
+  display: flex;
+  gap: 4px;
+}
+
+.tab-bar .tab {
+  border-radius: 8px 8px 0 0;
+  border-bottom: 3px solid transparent;
+  font-weight: bold;
+}
+
+.tab-bar .tab.active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+.header-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ==== パネル ==== */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.top-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 980px) {
+  .top-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==== メタデータフォーム ==== */
+.metadata-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+
+.metadata-form label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metadata-form label > span {
+  width: 88px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.metadata-form input,
+.metadata-form select {
+  flex: 1;
+  min-width: 0;
+}
+
+.metadata-form .balloon-field {
+  grid-column: 1 / -1;
+}
+
+.metadata-form .balloon-field button {
+  flex-shrink: 0;
+}
+
+/* ==== 音源パネル ==== */
+.audio-panel {
+  margin-bottom: 12px;
+}
+
+.audio-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.audio-name {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+label.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ==== オフセット ==== */
+.offset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.offset-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.offset-panel input[type='number'] {
+  width: 110px;
+}
+
+.offset-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.offset-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 4px 0 0;
+  line-height: 1.6;
+}
+
+/* ==== 固定バー（再生・パレット） ==== */
+.sticky-bar {
+  position: sticky;
+  /* 固定ヘッダの実高さ（App側でResizeObserverが--header-hにセット）の直下に固定する */
+  top: var(--header-h, 56px);
+  z-index: 10;
+  background: var(--bg);
+  padding: 8px 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.time-display {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.selection-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.selection-info {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ==== パレット ==== */
+.palette {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.palette-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 8px;
+  min-width: 76px;
+}
+
+.palette-btn.active {
+  outline: 3px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.palette-name {
+  font-size: 11px;
+}
+
+.palette-key {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ==== ノーツの見た目 ==== */
+.note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: bold;
+  color: #fff;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.note.n0 {
+  background: transparent;
+  color: var(--muted);
+  border: 1px dashed var(--border);
+}
+
+.note.n1 { background: var(--don); }
+.note.n2 { background: var(--ka); }
+.note.n3 {
+  background: var(--don);
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--don);
+}
+.note.n4 {
+  background: var(--ka);
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ka);
+}
+.note.n5 { background: var(--roll); color: #5a4500; }
+.note.n6 {
+  background: var(--roll);
+  color: #5a4500;
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--roll);
+}
+.note.n7 { background: var(--balloon); }
+.note.n8 {
+  background: var(--end);
+  border-radius: 4px;
+}
+.note.n-eraser {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+/* ==== 小節グリッド ==== */
+.measure-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.measure {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.measure.in-selection {
+  background: var(--selected);
+}
+
+.measure.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.measure-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.measure-header .spacer {
+  flex: 1;
+}
+
+.measure-no {
+  font-weight: bold;
+}
+
+.measure-time,
+.measure-bpm-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.measure-info {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.measure-body {
+  /* 左端の線上ノーツ（大ノーツ含む）がはみ出せる余白を確保する */
+  padding: 8px 20px;
+  overflow: visible;
+}
+
+/* ==== レーン（線上配置のノーツ表示） ==== */
+.lane {
+  position: relative;
+  /* ノーツの重なり順に使うz-indexをレーン内に閉じ込める
+     （固定バーなど外のUIより上に出ないようにする） */
+  isolation: isolate;
+  z-index: 0;
+  box-sizing: content-box; /* widthは内容幅そのもの（線の位置計算とずらさない） */
+  background-color: var(--slot-bg);
+  border-left: 2px solid var(--slot-beat);
+  border-right: 2px solid var(--slot-beat);
+  cursor: crosshair;
+  user-select: none;
+  /* タッチ: 縦スクロールは許可しつつ、横方向のドラッグを範囲選択に使う */
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
+}
+
+.lane-note {
+  position: absolute;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: bold;
+  line-height: 1;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.lane-note.n1 { background: var(--don); }
+.lane-note.n2 { background: var(--ka); }
+.lane-note.n3 { background: var(--don); }
+.lane-note.n4 { background: var(--ka); }
+.lane-note.n5 { background: var(--roll); color: #5a4500; }
+.lane-note.n6 { background: var(--roll); color: #5a4500; }
+.lane-note.n7 { background: var(--balloon); }
+.lane-note.n8 {
+  background: var(--end);
+  border-style: dashed;
+}
+
+.roll-bar {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;
+  border-top: 2px solid rgba(255, 255, 255, 0.9);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+
+.roll-bar.roll { background: var(--roll); }
+.roll-bar.balloon { background: var(--balloon); }
+
+/* 風船の必要打数ラベル */
+.roll-count {
+  position: absolute;
+  transform: translateY(-50%);
+  z-index: 250;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* コンパクト描画（全体表示）: 白枠を細く・ノーツ文字は表示しない */
+.lane.compact .lane-note {
+  border-width: 1px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  color: transparent;
+}
+
+.lane.compact .roll-bar {
+  border-top-width: 1px;
+  border-bottom-width: 1px;
+}
+
+.lane-selection {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.lane-cursor {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--accent);
+  z-index: 300;
+  pointer-events: none;
+  box-shadow: 0 0 4px var(--accent);
+}
+
+.lane-cursor::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -4px;
+  border: 5px solid transparent;
+  border-top-color: var(--accent);
+}
+
+.playbar {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--playbar);
+  pointer-events: none;
+  z-index: 400;
+  box-shadow: 0 0 4px var(--playbar);
+}
+
+.measure-footer {
+  display: flex;
+  gap: 10px;
+  padding: 4px 8px 6px;
+  font-size: 11px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.measure-footer label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.measure-footer input[type='number'] {
+  width: 52px;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.measure-footer select {
+  padding: 2px 4px;
+  font-size: 11px;
+}
+
+.tja-div {
+  align-self: center;
+  font-size: 11px;
+}
+
+.gogo-toggle {
+  font-weight: bold;
+}
+
+/* ゴーゴータイムの小節はレーンをほんのり赤く */
+.measure.gogo .lane,
+.ov-measure.gogo .lane {
+  background-color: color-mix(in srgb, var(--don) 14%, var(--slot-bg));
+}
+
+.measure.gogo .measure-no {
+  color: var(--don);
+}
+
+.add-measure {
+  align-self: center;
+  min-height: 60px;
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.input-unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.input-unit select {
+  font-weight: bold;
+}
+
+.input-unit-hint {
+  font-size: 10px;
+}
+
+/* ==== 全体表示（小節を隙間なく連結してWiki譜面画像風にする） ==== */
+.overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 0;
+  align-items: flex-start;
+  /* 内部のノーツz-indexを全体表示の中に閉じ込める */
+  isolation: isolate;
+}
+
+/* 小節をまたぐ重なり順はzBase（前の小節ほど大きい）で制御するため、
+   レーン単位の分離を解除してノーツを全体表示のコンテキストで比較させる */
+.overview .lane {
+  isolation: auto;
+  z-index: auto;
+  /* 境界の枠線は1px+1px=2pxの小節線にする。margin-left:-2pxとの組み合わせで
+     隣の小節の内容領域が正確に連続し、小節をまたぐノーツ間隔が広がらない */
+  border-left-width: 1px;
+  border-right-width: 1px;
+}
+
+.overview .playbar {
+  z-index: 90000000;
+}
+
+.ov-measure {
+  position: relative;
+  padding: 14px 0 4px;
+  cursor: pointer;
+}
+
+/* 隣接する小節の境界線（2px+2px）を重ねて1本にする */
+.ov-measure + .ov-measure {
+  margin-left: -2px;
+}
+
+.ov-measure:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.ov-measure.active {
+  background: color-mix(in srgb, var(--playbar) 12%, transparent);
+}
+
+.ov-no {
+  position: absolute;
+  top: 1px;
+  left: 2px;
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-measure .lane {
+  cursor: pointer;
+}
+
+/* ==== プレイ画面 ==== */
+.play-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.play-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.play-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.play-keys button.capturing {
+  outline: 2px solid var(--accent);
+  color: var(--accent);
+}
+
+.play-canvas-wrap {
+  position: relative;
+}
+
+.play-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+  /* タップ演奏エリア: スクロール等に取られないようにする */
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.play-results {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--panel);
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  padding: 16px 28px;
+  text-align: center;
+  z-index: 10;
+}
+
+.play-results h3 {
+  margin: 0 0 8px;
+}
+
+.play-results table {
+  margin: 0 auto 10px;
+  border-collapse: collapse;
+}
+
+.play-results td {
+  padding: 2px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.play-results td:last-child {
+  text-align: right;
+  font-weight: bold;
+}
+
+.play-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.calibration-row {
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+
+/* ==== 統計 ==== */
+.stats-bar {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.stats-bar b {
+  color: var(--text);
+  font-size: 15px;
+}
+
+/* ==== バリデーション ==== */
+.validation ul {
+  margin: 0;
+  padding-left: 4px;
+  list-style: none;
+}
+
+.validation li {
+  padding: 2px 0;
+}
+
+.validation li.error {
+  color: var(--error);
+}
+
+.validation li.warning {
+  color: var(--warning);
+}
+
+.validation.ok {
+  color: var(--ok);
+}
+
+/* ==== エクスポート ==== */
+.export-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.course-chooser {
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.course-chooser p {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.course-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.import-warnings {
+  margin: 8px 0;
+  padding-left: 4px;
+  list-style: none;
+  color: var(--warning);
+  font-size: 13px;
+}
+
+.tja-preview {
+  width: 100%;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  white-space: pre;
+  resize: vertical;
+}
+
+/* ==== フッタ ==== */
+.app-footer {
+  margin-top: 20px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+/* ==== スマホ版モード（起動時にユーザーが選択。.app.mode-mobile 配下に適用） ====
+   注意: 同一詳細度の基本ルールに勝つため、必ずファイル末尾に置くこと */
+.mode-mobile .palette {
+  display: none; /* 下部の入力パッドで置き換える */
+}
+
+.mode-mobile .play-keys {
+  display: none; /* キー設定は隠す（タップ演奏を使う） */
+}
+
+.mode-mobile .metadata-form {
+  grid-template-columns: 1fr;
+}
+
+.app.with-pad {
+  /* 下部固定パッドに隠れないよう余白を確保 */
+  padding-bottom: calc(150px + env(safe-area-inset-bottom));
+}
+
+.mode-mobile .app-footer {
+  display: none; /* キーボード操作の説明はスマホ版では不要 */
+}
+
+/* ==== モード選択画面 ==== */
+.mode-select {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px calc(16px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom))
+    calc(16px + env(safe-area-inset-left));
+}
+
+.mode-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 28px 26px;
+  max-width: 620px;
+  width: 100%;
+  text-align: center;
+}
+
+.mode-card h1 {
+  font-size: 26px;
+  margin-bottom: 8px;
+}
+
+.mode-desc {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+  margin: 0 0 18px;
+}
+
+.mode-buttons {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.mode-btn {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 14px 16px;
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  font-size: 16px;
+}
+
+.mode-btn:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+}
+
+.mode-icon {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.mode-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mode-btn .badge {
+  position: absolute;
+  top: -10px;
+  right: 10px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.mode-btn .badge.last {
+  background: var(--muted);
+}
+
+.ad-slot {
+  margin-top: 20px;
+  min-height: 90px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mode-footnote {
+  margin: 14px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
