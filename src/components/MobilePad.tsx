@@ -1,6 +1,7 @@
 import { PointerEvent } from 'react';
 import { INPUT_UNIT_OPTIONS, NOTE_VALUES, NoteValue } from '../types';
 import { NOTE_INFO } from '../noteInfo';
+import { fmtTime } from './Transport';
 
 /**
  * スマホ用の画面下部固定入力パッド。
@@ -11,6 +12,8 @@ interface Props {
   eraser: boolean;
   canUndo: boolean;
   isPlaying: boolean;
+  /** 譜面時刻（秒）。再生位置の表示に使う */
+  playhead: number;
   onChangeInputUnit: (unit: number) => void;
   onToggleEraser: () => void;
   onMove: (dm: number, ds: number) => void;
@@ -18,6 +21,7 @@ interface Props {
   onClear: () => void;
   onUndo: () => void;
   onPlayPause: () => void;
+  onStop: () => void;
 }
 
 export default function MobilePad({
@@ -25,6 +29,7 @@ export default function MobilePad({
   eraser,
   canUndo,
   isPlaying,
+  playhead,
   onChangeInputUnit,
   onToggleEraser,
   onMove,
@@ -32,6 +37,7 @@ export default function MobilePad({
   onClear,
   onUndo,
   onPlayPause,
+  onStop,
 }: Props) {
   // pointerdownで即時反応させる（clickの遅延やフォーカス移動を避ける）
   const press = (fn: () => void) => (e: PointerEvent) => {
@@ -72,9 +78,18 @@ export default function MobilePad({
         <button type="button" className="pad-btn" disabled={!canUndo} title="元に戻す" onPointerDown={press(onUndo)}>
           ↩
         </button>
-        <button type="button" className="pad-btn" title="再生 / 一時停止" onPointerDown={press(onPlayPause)}>
+        <button
+          type="button"
+          className={`pad-btn ${isPlaying ? 'pad-playing' : ''}`}
+          title="再生 / 一時停止"
+          onPointerDown={press(onPlayPause)}
+        >
           {isPlaying ? '⏸' : '▶︎'}
         </button>
+        <button type="button" className="pad-btn" title="停止（開始位置に戻る）" onPointerDown={press(onStop)}>
+          ⏹
+        </button>
+        <span className="pad-time">{fmtTime(playhead)}</span>
       </div>
       <div className="pad-row">
         {NOTE_VALUES.filter((v) => v !== 0).map((v) => {

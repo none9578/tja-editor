@@ -1,7 +1,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Measure, Metadata, NoteValue, Project } from './types';
 import { cloneMeasure, createMeasure, createProject, normalizeProject, uid } from './project';
-import { chartToAudio, computeTimings, totalDuration } from './utils/timing';
+import { computeTimings, totalDuration } from './utils/timing';
 import { validateProject } from './utils/validation';
 import { computeStats } from './utils/stats';
 import {
@@ -141,8 +141,9 @@ export default function App() {
   );
 
   // 再生時の自動ヒット音イベント。
-  // 通常ノーツに加え、連打・風船は20分音符間隔の自動ドンに展開する
-  // （風船は必要打数に達したら止める）。
+  // 通常ノーツに加え、連打は20分音符間隔の自動ドンに展開する。
+  // 風船は「開始〜終了の区間で必要打数をちょうど叩き終わる」ように均等配分し、
+  // 最後の1打が終了位置に一致する（＝そこで破裂する）。
   const autoEvents = useMemo<NoteEvent[]>(() => {
     const events: NoteEvent[] = [];
     project.measures.forEach((m, mi) => {
@@ -155,14 +156,24 @@ export default function App() {
     for (const s of rollSpans) {
       const startT = timeAt(s.startM, s.startF);
       const endT = timeAt(s.endM, s.endF);
-      const bpm = timings[s.startM].bpm;
-      const interval = (60 / bpm) * (4 / 20); // 20分音符間隔
-      const maxHits =
-        s.type === 7 ? (project.metadata.balloon[s.balloonIndex] ?? 5) : Number.POSITIVE_INFINITY;
-      let hits = 0;
-      for (let t = startT; t < endT - 1e-4 && hits < maxHits; t += interval) {
-        events.push({ time: t, type: s.type === 6 ? 'bigDon' : 'don' });
-        hits += 1;
+      if (s.type === 7) {
+        const count = project.metadata.balloon[s.balloonIndex] ?? 5;
+        const dur = endT - startT;
+        if (dur > 1e-4 && count > 0) {
+          if (count === 1) {
+            events.push({ time: endT, type: 'don' });
+          } else {
+            for (let i = 0; i < count; i++) {
+              events.push({ time: startT + (dur * i) / (count - 1), type: 'don' });
+            }
+          }
+        }
+      } else {
+        const bpm = timings[s.startM].bpm;
+        const interval = (60 / bpm) * (4 / 20); // 20分音符間隔
+        for (let t = startT; t < endT - 1e-4; t += interval) {
+          events.push({ time: t, type: s.type === 6 ? 'bigDon' : 'don' });
+        }
       }
     }
     events.sort((a, b) => a.time - b.time);
@@ -618,8 +629,6 @@ export default function App() {
     handlePlay,
   ]);
 
-  const audioTime = chartToAudio(player.playhead, project.metadata.offset + calibration);
-
   // 起動直後はモード選択画面（広告スペース付き）を表示する
   if (uiMode === null) {
     return (
@@ -713,74 +722,74 @@ export default function App() {
         </div>
       )}
 
-      {tab !== 'play' && (
+      {tab === 'edit' && (
         <div className="sticky-bar">
-          <Transport
-            isPlaying={player.isPlaying}
-            playhead={player.playhead}
-            audioTime={audioTime}
-            measureCount={project.measures.length}
-            playFromMeasure={playFromMeasure}
-            onChangePlayFrom={setPlayFromMeasure}
-            onPlay={handlePlay}
-            onPause={player.pause}
-            onStop={player.stop}
-            onPlayFromTop={() => playFrom(0)}
-          />
-          {tab === 'edit' && (
-            <>
-              {!isMobile && (
-                <Palette
-                  selected={selectedNote}
-                  eraser={eraser}
-                  inputUnit={inputUnit}
-                  onSelect={(v) => {
-                    setSelectedNote(v);
-                    setEraser(false);
-                  }}
-                  onToggleEraser={() => setEraser((x) => !x)}
-                  onChangeInputUnit={changeInputUnit}
-                  onPreview={player.preview}
-                />
-              )}
-              <div className="selection-tools">
-                <span className="selection-info">
-                  {noteSel
-                    ? `ノーツ範囲選択中（Delete で削除 / Esc で解除）`
-                    : selection
-                      ? selection.start === selection.end
-                        ? `小節${selection.start + 1}を選択中`
-                        : `小節${selection.start + 1}〜${selection.end + 1}を選択中`
-                      : 'ドラッグでノーツ範囲選択 / 小節ヘッダをクリックで小節選択（Shift+クリックで範囲）'}
-                </span>
-                {noteSel && (
-                  <button type="button" className="mini danger" onClick={deleteNoteSelection}>
-                    選択ノーツを削除
-                  </button>
-                )}
-                <button type="button" className="mini" disabled={!selection} onClick={copySelection}>
-                  小節コピー
-                </button>
-                <button
-                  type="button"
-                  className="mini"
-                  disabled={clipboard.length === 0}
-                  onClick={pasteClipboard}
-                >
-                  貼り付け({clipboard.length})
-                </button>
-                <button
-                  type="button"
-                  className="mini danger"
-                  disabled={!selection}
-                  onClick={deleteSelection}
-                >
-                  小節削除
-                </button>
-              </div>
-            </>
+          {!isMobile && (
+            <Palette
+              selected={selectedNote}
+              eraser={eraser}
+              inputUnit={inputUnit}
+              onSelect={(v) => {
+                setSelectedNote(v);
+                setEraser(false);
+              }}
+              onToggleEraser={() => setEraser((x) => !x)}
+              onChangeInputUnit={changeInputUnit}
+              onPreview={player.preview}
+            />
           )}
+          <div className="selection-tools">
+            <span className="selection-info">
+              {noteSel
+                ? `ノーツ範囲選択中（Delete で削除 / Esc で解除）`
+                : selection
+                  ? selection.start === selection.end
+                    ? `小節${selection.start + 1}を選択中`
+                    : `小節${selection.start + 1}〜${selection.end + 1}を選択中`
+                  : 'ドラッグでノーツ範囲選択 / 小節ヘッダをクリックで小節選択（Shift+クリックで範囲）'}
+            </span>
+            {noteSel && (
+              <button type="button" className="mini danger" onClick={deleteNoteSelection}>
+                選択ノーツを削除
+              </button>
+            )}
+            <button type="button" className="mini" disabled={!selection} onClick={copySelection}>
+              小節コピー
+            </button>
+            <button
+              type="button"
+              className="mini"
+              disabled={clipboard.length === 0}
+              onClick={pasteClipboard}
+            >
+              貼り付け({clipboard.length})
+            </button>
+            <button
+              type="button"
+              className="mini danger"
+              disabled={!selection}
+              onClick={deleteSelection}
+            >
+              小節削除
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* フローティング再生バー（スクロールしても常に手が届く）。
+          スマホ編集時は入力パッド側に再生・停止があるため出さない */}
+      {tab !== 'play' && !(isMobile && tab === 'edit') && (
+        <Transport
+          isPlaying={player.isPlaying}
+          playhead={player.playhead}
+          measureCount={project.measures.length}
+          playFromMeasure={playFromMeasure}
+          onChangePlayFrom={setPlayFromMeasure}
+          onPlay={handlePlay}
+          onPause={player.pause}
+          onStop={player.stop}
+          onPlayFromTop={() => playFrom(0)}
+        />
       )}
 
       {tab === 'edit' && (
@@ -860,6 +869,7 @@ export default function App() {
           eraser={eraser}
           canUndo={canUndo}
           isPlaying={player.isPlaying}
+          playhead={player.playhead}
           onChangeInputUnit={changeInputUnit}
           onToggleEraser={() => setEraser((x) => !x)}
           onMove={moveCursorBy}
@@ -867,6 +877,7 @@ export default function App() {
           onClear={clearAtCursor}
           onUndo={undo}
           onPlayPause={() => (player.isPlaying ? player.pause() : handlePlay())}
+          onStop={player.stop}
         />
       )}
 

@@ -66,8 +66,9 @@ body {
 .app {
   max-width: 1400px;
   margin: 0 auto;
-  /* iOSスタンドアロン表示のノッチ・ホームバーを避ける */
-  padding: 12px calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom))
+  /* iOSスタンドアロン表示のノッチ・ホームバーを避ける。
+     下部はフローティング再生バーに隠れないよう広めに取る */
+  padding: 12px calc(16px + env(safe-area-inset-right)) calc(110px + env(safe-area-inset-bottom))
     calc(16px + env(safe-area-inset-left));
 }
 
@@ -163,6 +164,21 @@ body {
   text-align: center;
   font-weight: bold;
   touch-action: manipulation;
+}
+
+.pad-time {
+  flex: 1.2;
+  max-width: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pad-btn.pad-playing {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* ==== 折りたたみパネル（スマホ版） ==== */
@@ -409,19 +425,76 @@ label.inline {
   margin-bottom: 12px;
 }
 
-.transport {
+/* ==== フローティング再生バー（画面下部に常時固定） ==== */
+.float-transport {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 45;
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
 }
 
-.time-display {
+.ft-btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.ft-btn:hover:not(:disabled) {
+  border: none;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.ft-btn:active {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.ft-btn.ft-main {
+  width: 50px;
+  height: 50px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 20px;
+}
+
+.ft-btn.ft-main:hover {
+  filter: brightness(1.08);
+  background: var(--accent);
+}
+
+.ft-measure select {
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  padding: 8px 10px;
+  font-weight: bold;
+}
+
+.ft-time {
   font-variant-numeric: tabular-nums;
   font-size: 13px;
   color: var(--muted);
-  margin-left: auto;
+  min-width: 62px;
+  text-align: center;
 }
 
 .selection-tools {
@@ -1062,20 +1135,6 @@ label.inline {
   padding: 5px 8px;
   font-size: 11px;
   border-radius: 8px;
-}
-
-.mode-mobile .transport {
-  gap: 5px;
-}
-
-.mode-mobile .transport button {
-  padding: 6px 9px;
-  font-size: 12px;
-  border-radius: 8px;
-}
-
-.mode-mobile .time-display {
-  font-size: 11px;
 }
 
 .mode-mobile .selection-tools {

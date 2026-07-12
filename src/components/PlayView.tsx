@@ -149,20 +149,23 @@ export default function PlayView({
       const wrap = wrapRef.current;
       if (!canvas || !wrap) return;
       const W = wrap.clientWidth;
-      const H = 230;
+      const mobile = W < 620;
+      // 横に長い画面ほどレーン上下の黒帯を増やして、飛んでいくノーツの
+      // 上向きの角度を確保する（縦画面は従来どおり230px）
+      const H = mobile ? 230 : Math.min(420, Math.round(230 + (W - 620) * 0.5));
       if (canvas.width !== W) canvas.width = W;
       if (canvas.height !== H) canvas.height = H;
       const ctx = canvas.getContext('2d')!;
       const now = player.playheadRef.current;
 
-      const laneY = 60;
       const laneH = 110;
+      const laneY = H - laneH - 60;
       const cy = laneY + laneH / 2;
-      const mobile = W < 620;
       const noteR = mobile ? 15 : NOTE_R;
       const bigR = mobile ? 22 : BIG_R;
       const ppb = 2 * noteR * (76 / 23);
-      const hitX = mobile ? 60 : 110;
+      // 縦画面はノーツが判定枠に届くまでの距離を稼ぐため判定枠を左に寄せる
+      const hitX = mobile ? 44 : 110;
 
       // 現在の小節（ゴーゴー判定）
       let inGogo = false;
@@ -267,9 +270,10 @@ export default function PlayView({
         drawNote(x, cy, big ? bigR : noteR, don ? '#e0452a' : '#2a7fc4');
       }
 
-      // 叩かれたノーツが右上へ飛んでいく演出（連打の自動ドンも飛ぶ）
-      const tx = W - 34;
+      // 叩かれたノーツが右上へ飛んでいく演出（連打の自動ドンも飛ぶ）。
+      // 横成分は縦の落差の3倍までに抑え、横長画面でも角度が浅くなりすぎないようにする
       const ty = 22;
+      const tx = Math.min(W - 34, hitX + (cy - ty) * 3);
       for (const e of events) {
         const p = (now - e.time) / FLY_SEC;
         if (p < 0 || p >= 1) continue;
@@ -278,7 +282,7 @@ export default function PlayView({
         // 判定枠から右上コーナーへ、山なりの軌道（2次ベジェ）で飛ばす
         const q = 1 - p;
         const cx2 = hitX + (tx - hitX) * 0.35;
-        const cy2 = laneY - 55;
+        const cy2 = laneY * 0.25 - 10;
         const x = q * q * hitX + 2 * q * p * cx2 + p * p * tx;
         const y = q * q * cy + 2 * q * p * cy2 + p * p * ty;
         const r = (big ? bigR : noteR) * (1 - 0.45 * p);
