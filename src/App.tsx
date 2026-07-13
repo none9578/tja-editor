@@ -889,16 +889,15 @@ export default function App() {
       {isMobile && tab === 'edit' && (
         <MobilePad
           inputUnit={inputUnit}
-          eraser={eraser}
           canUndo={canUndo}
           isPlaying={player.isPlaying}
           playhead={player.playhead}
           measureCount={project.measures.length}
           playFromMeasure={playFromMeasure}
           onChangeInputUnit={changeInputUnit}
-          onToggleEraser={() => setEraser((x) => !x)}
           onMove={moveCursorBy}
           onInput={inputAtCursor}
+          onClear={clearAtCursor}
           onUndo={undo}
           onPlayPause={() => (player.isPlaying ? player.pause() : handlePlay())}
           onStop={player.stop}

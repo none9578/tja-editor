@@ -11,7 +11,6 @@ import { fmtTime } from './Transport';
  */
 interface Props {
   inputUnit: number;
-  eraser: boolean;
   canUndo: boolean;
   isPlaying: boolean;
   /** 譜面時刻（秒）。再生位置の表示に使う */
@@ -19,9 +18,9 @@ interface Props {
   measureCount: number;
   playFromMeasure: number;
   onChangeInputUnit: (unit: number) => void;
-  onToggleEraser: () => void;
   onMove: (dm: number, ds: number) => void;
   onInput: (v: NoteValue) => void;
+  onClear: () => void;
   onUndo: () => void;
   onPlayPause: () => void;
   onStop: () => void;
@@ -31,16 +30,15 @@ interface Props {
 
 export default function MobilePad({
   inputUnit,
-  eraser,
   canUndo,
   isPlaying,
   playhead,
   measureCount,
   playFromMeasure,
   onChangeInputUnit,
-  onToggleEraser,
   onMove,
   onInput,
+  onClear,
   onUndo,
   onPlayPause,
   onStop,
@@ -169,15 +167,10 @@ export default function MobilePad({
             </button>
           );
         })}
-        {/* 空白入力は▶（1つ進む）、カーソル位置の消去は↩や消しゴムで代替できる
-            ため、ノーツボタンを大きく保つよう消しゴムだけを置く */}
-        <button
-          type="button"
-          className={`pad-btn ${eraser ? 'active' : ''}`}
-          title="消しゴムモード（レーンをタップで消す）"
-          onPointerDown={press(onToggleEraser)}
-        >
-          消
+        {/* 消去はカーソル位置を消す🗑に一本化（空白入力は▶で代替できる）。
+            ノーツボタンを大きく保つため消去系ボタンはこれ1つだけにする */}
+        <button type="button" className="pad-btn" title="カーソル位置を消す" onPointerDown={press(onClear)}>
+          🗑
         </button>
       </div>
     </div>
