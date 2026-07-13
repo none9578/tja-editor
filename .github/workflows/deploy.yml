@@ -1,4 +1,8 @@
 # mainにpushされるたびにビルドしてGitHub Pagesへ自動公開する
+# 公開方式: ビルド成果物(dist)をgh-pagesブランチへforce pushし、
+# GitHub Pages(ソース: gh-pagesブランチ)が配信する。
+# ※ actions/deploy-pages方式はPagesサイト作成にリポジトリ管理者権限が
+#   必要で初回実行が失敗するため、GITHUB_TOKENだけで完結するこの方式にしている。
 name: Deploy to GitHub Pages
 
 on:
@@ -7,16 +11,14 @@ on:
   workflow_dispatch: # 手動実行も可能にしておく
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,20 +28,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - uses: actions/configure-pages@v5
-        with:
-          # 初回実行時にPagesを自動で有効化する
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish dist to gh-pages branch
+        run: |
+          cd dist
+          touch .nojekyll
+          git init -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Deploy ${GITHUB_SHA::7} to GitHub Pages"
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
