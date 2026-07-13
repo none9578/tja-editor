@@ -289,7 +289,11 @@ export function parseTja(text: string): ImportResult {
 
 /** .tja ファイルとしてダウンロードする */
 export function downloadText(text: string, filename: string): void {
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), filename);
+}
+
+/** バイナリ（zip・音源ファイルなど）をダウンロードする */
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

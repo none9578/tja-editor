@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Project } from '../types';
-import { downloadText, generateTja, parseTja } from '../utils/tja';
+import { downloadBlob, downloadText, generateTja, parseTja } from '../utils/tja';
+import { makeZip } from '../utils/zip';
 
 interface Props {
   project: Project;
@@ -35,6 +36,26 @@ export default function ExportPanel({
     setPreview(text);
     const name = (project.metadata.title || 'chart').replace(/[\\/:*?"<>|]/g, '_');
     downloadText(text, `${name}.tja`);
+  };
+
+  /** 読み込んだ音源ファイルをそのままダウンロードする */
+  const downloadAudio = () => {
+    const f = getAudioFile();
+    if (f) downloadBlob(f, f.name);
+  };
+
+  /** .tja＋音源をzipで書き出す（太鼓さん大次郎などのzipインポート向け） */
+  const downloadZip = async () => {
+    const f = getAudioFile();
+    if (!f) return;
+    const text = generateTja(project);
+    setPreview(text);
+    const name = (project.metadata.title || 'chart').replace(/[\\/:*?"<>|]/g, '_');
+    const zip = makeZip([
+      { name: `${name}.tja`, data: new TextEncoder().encode(text) },
+      { name: f.name, data: new Uint8Array(await f.arrayBuffer()) },
+    ]);
+    downloadBlob(zip, `${name}.zip`);
   };
 
   const importTja = async (file: File) => {
@@ -106,6 +127,18 @@ export default function ExportPanel({
       <div className="export-buttons">
         <button type="button" className="primary" onClick={download}>
           ⬇ .tja をダウンロード
+        </button>
+        <button
+          type="button"
+          className="primary"
+          disabled={!getAudioFile()}
+          title="太鼓さん大次郎などのzipインポートにそのまま使えます"
+          onClick={() => void downloadZip()}
+        >
+          ⬇ .tja＋音源をzipで
+        </button>
+        <button type="button" disabled={!getAudioFile()} onClick={downloadAudio}>
+          ⬇ 音源をダウンロード
         </button>
         <button type="button" onClick={refresh}>TJAプレビューを更新</button>
         <button type="button" onClick={() => tjaInputRef.current?.click()}>
