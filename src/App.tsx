@@ -515,7 +515,8 @@ export default function App() {
 
   /** 小節プレビュー用: 一時停止して再生開始位置を前後の小節頭へ動かす
       （再生中でも止まる。再生は▶で行う）。
-      戻る（d<0）は小節の途中なら現在の小節頭に戻る（音楽プレイヤーの曲戻しと同じ感覚） */
+      戻る（d<0）は小節の途中なら常に現在の小節頭へ。頭にいるときだけ前の小節へ
+      （音楽プレイヤーの曲戻しと同じ感覚） */
   const stepPlayMeasure = useCallback(
     (d: number) => {
       const wasActive = playerRef.current.isPlaying || playerRef.current.playheadRef.current > 0;
@@ -524,7 +525,7 @@ export default function App() {
       let cur = Math.min(playFromMeasure - 1, timings.length - 1);
       if (wasActive) {
         for (let i = 0; i < timings.length; i++) if (timings[i].startTime <= ph + 1e-3) cur = i;
-        if (d < 0 && ph - timings[cur].startTime > 0.5) d += 1;
+        if (d < 0 && ph - timings[cur].startTime > 1e-3) d += 1;
       }
       const target = Math.min(Math.max(cur + d, 0), timings.length - 1);
       const t = timings[target];
