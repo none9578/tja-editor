@@ -72,12 +72,11 @@ export default function ExportPanel({ project, onImport, onLoadJson }: Props) {
         <button type="button" onClick={() => jsonInputRef.current?.click()}>
           プロジェクトJSONを読み込み
         </button>
-        {/* .tjaはOS未登録の拡張子で、拡張子指定だけだとiOS等のピッカーで
-            選択不可になるため、汎用MIMEも許可してモバイルでも選べるようにする */}
+        {/* .tjaはOS未登録の拡張子で、acceptで絞る（MIME併記でも）と
+            モバイルのピッカーで選択不可になるため、絞り込みなしにしている */}
         <input
           ref={tjaInputRef}
           type="file"
-          accept=".tja,.txt,text/plain,application/octet-stream"
           hidden
           onChange={(e) => {
             const f = e.target.files?.[0];
