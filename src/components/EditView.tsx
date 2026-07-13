@@ -275,6 +275,8 @@ interface EditViewProps {
   showPlayhead: boolean;
   isPlaying: boolean;
   eraser: boolean;
+  /** レーンのタップ/クリックでノーツを配置するか（スマホ版はパッド入力に統一するためfalse） */
+  tapPlaces: boolean;
   onPlaceAt: (mi: number, k: number) => void;
   onEraseAt: (mi: number, frac: number) => void;
   onNoteSelChange: (sel: NoteSelection | null) => void;
@@ -347,7 +349,7 @@ export default function EditView(props: EditViewProps) {
       dragRef.current = null;
       if (!drag || drag.moved) return;
       if (props.eraser) props.onEraseAt(drag.mi, drag.frac);
-      else props.onPlaceAt(drag.mi, drag.k);
+      else if (props.tapPlaces) props.onPlaceAt(drag.mi, drag.k);
     };
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
@@ -355,7 +357,7 @@ export default function EditView(props: EditViewProps) {
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
-  }, [props.eraser, props.onEraseAt, props.onPlaceAt]);
+  }, [props.eraser, props.tapPlaces, props.onEraseAt, props.onPlaceAt]);
 
   const handleLaneContext = useCallback(
     (mi: number, frac: number) => {

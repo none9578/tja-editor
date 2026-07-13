@@ -25,7 +25,8 @@ interface Props {
   onPlayPause: () => void;
   onStop: () => void;
   onChangePlayFrom: (measureNo: number) => void;
-  onPlayFromTop: () => void;
+  /** 前/次の小節頭へ飛んで再生（小節プレビュー用） */
+  onStepMeasure: (d: number) => void;
 }
 
 export default function MobilePad({
@@ -43,7 +44,7 @@ export default function MobilePad({
   onPlayPause,
   onStop,
   onChangePlayFrom,
-  onPlayFromTop,
+  onStepMeasure,
 }: Props) {
   const [padMode, setPadMode] = useState<'edit' | 'play'>('edit');
 
@@ -54,22 +55,24 @@ export default function MobilePad({
   };
 
   if (padMode === 'play') {
+    // 小節プレビューが主用途なので⏮⏭は「前/次の小節から再生」。
+    // 編集⇔再生の切替ボタンは編集モードと同じ右端に置き、指の移動を無くす
     return (
       <div className="mobile-pad">
         <div className="pad-row pad-row-play">
           <button
             type="button"
-            className="pad-btn pad-toggle"
-            title="編集操作に戻る"
-            onPointerDown={press(() => setPadMode('edit'))}
+            className="pad-btn"
+            title="停止（開始位置に戻る）"
+            onPointerDown={press(onStop)}
           >
-            ✏ 編集
+            ⏹
           </button>
           <button
             type="button"
             className="pad-btn"
-            title="小節1から再生"
-            onPointerDown={press(onPlayFromTop)}
+            title="前の小節から再生（小節の途中なら小節頭へ）"
+            onPointerDown={press(() => onStepMeasure(-1))}
           >
             ⏮
           </button>
@@ -84,10 +87,10 @@ export default function MobilePad({
           <button
             type="button"
             className="pad-btn"
-            title="停止（開始位置に戻る）"
-            onPointerDown={press(onStop)}
+            title="次の小節から再生"
+            onPointerDown={press(() => onStepMeasure(1))}
           >
-            ⏹
+            ⏭
           </button>
           <select
             className="pad-unit"
@@ -105,6 +108,14 @@ export default function MobilePad({
             ))}
           </select>
           <span className="pad-time">{fmtTime(playhead)}</span>
+          <button
+            type="button"
+            className="pad-btn pad-toggle"
+            title="編集操作に戻る"
+            onPointerDown={press(() => setPadMode('edit'))}
+          >
+            ✏ 編集
+          </button>
         </div>
       </div>
     );

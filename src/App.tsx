@@ -513,6 +513,21 @@ export default function App() {
     playerRef.current.play(from);
   }, [playFromMeasure, timings, chartEnd]);
 
+  /** 小節プレビュー用: 前後の小節頭へ飛んで再生する。
+      戻る（d<0）は小節の途中なら現在の小節頭に戻る（音楽プレイヤーの曲戻しと同じ感覚） */
+  const stepPlayMeasure = useCallback(
+    (d: number) => {
+      const ph = playerRef.current.playheadRef.current;
+      let cur = Math.min(playFromMeasure - 1, timings.length - 1);
+      if (playerRef.current.isPlaying) {
+        for (let i = 0; i < timings.length; i++) if (timings[i].startTime <= ph + 1e-3) cur = i;
+        if (d < 0 && ph - timings[cur].startTime > 0.5) d += 1;
+      }
+      playFrom(Math.min(Math.max(cur + d, 0), timings.length - 1));
+    },
+    [playFromMeasure, timings, playFrom],
+  );
+
   const jumpTo = useCallback(
     (mi: number) => {
       const t = timings[mi];
@@ -823,6 +838,7 @@ export default function App() {
               showPlayhead={player.isPlaying || player.playhead > 0}
               isPlaying={player.isPlaying}
               eraser={eraser}
+              tapPlaces={!isMobile}
               onPlaceAt={placeAt}
               onEraseAt={eraseAt}
               onNoteSelChange={setNoteSel}
@@ -902,7 +918,7 @@ export default function App() {
           onPlayPause={() => (player.isPlaying ? player.pause() : handlePlay())}
           onStop={player.stop}
           onChangePlayFrom={setPlayFromMeasure}
-          onPlayFromTop={() => playFrom(0)}
+          onStepMeasure={stepPlayMeasure}
         />
       )}
 
