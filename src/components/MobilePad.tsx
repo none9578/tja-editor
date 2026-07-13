@@ -55,7 +55,7 @@ export default function MobilePad({
   };
 
   if (padMode === 'play') {
-    // 小節プレビューが主用途なので⏮⏭は「前/次の小節から再生」。
+    // 小節プレビューが主用途なので⏮⏭は「前/次の小節頭へ移動」（再生は▶で）。
     // 編集⇔再生の切替ボタンは編集モードと同じ右端に置き、指の移動を無くす
     return (
       <div className="mobile-pad">
@@ -71,7 +71,7 @@ export default function MobilePad({
           <button
             type="button"
             className="pad-btn"
-            title="前の小節から再生（小節の途中なら小節頭へ）"
+            title="前の小節頭へ移動（小節の途中ならまず頭へ）"
             onPointerDown={press(() => onStepMeasure(-1))}
           >
             ⏮
@@ -87,7 +87,7 @@ export default function MobilePad({
           <button
             type="button"
             className="pad-btn"
-            title="次の小節から再生"
+            title="次の小節頭へ移動"
             onPointerDown={press(() => onStepMeasure(1))}
           >
             ⏭

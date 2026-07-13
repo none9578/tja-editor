@@ -84,10 +84,11 @@ export default function ExportPanel({ project, onImport, onLoadJson }: Props) {
             e.target.value = '';
           }}
         />
+        {/* acceptで絞るとモバイルのピッカーで選択不可になる端末があるため絞らない
+            （.tjaインポートと同じ対応。読み込み時にJSONとして検証している） */}
         <input
           ref={jsonInputRef}
           type="file"
-          accept=".json"
           hidden
           onChange={(e) => {
             const f = e.target.files?.[0];

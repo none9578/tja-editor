@@ -513,19 +513,24 @@ export default function App() {
     playerRef.current.play(from);
   }, [playFromMeasure, timings, chartEnd]);
 
-  /** 小節プレビュー用: 前後の小節頭へ飛んで再生する。
+  /** 小節プレビュー用: 再生開始位置を前後の小節頭へ動かす。勝手に再生は始めない
+      （停止中は位置だけ移動して▶で再生、再生中は飛んで再生継続）。
       戻る（d<0）は小節の途中なら現在の小節頭に戻る（音楽プレイヤーの曲戻しと同じ感覚） */
   const stepPlayMeasure = useCallback(
     (d: number) => {
       const ph = playerRef.current.playheadRef.current;
       let cur = Math.min(playFromMeasure - 1, timings.length - 1);
-      if (playerRef.current.isPlaying) {
+      if (playerRef.current.isPlaying || ph > 0) {
         for (let i = 0; i < timings.length; i++) if (timings[i].startTime <= ph + 1e-3) cur = i;
         if (d < 0 && ph - timings[cur].startTime > 0.5) d += 1;
       }
-      playFrom(Math.min(Math.max(cur + d, 0), timings.length - 1));
+      const target = Math.min(Math.max(cur + d, 0), timings.length - 1);
+      const t = timings[target];
+      if (!t) return;
+      setPlayFromMeasure(target + 1);
+      playerRef.current.seek(t.startTime);
     },
-    [playFromMeasure, timings, playFrom],
+    [playFromMeasure, timings],
   );
 
   const jumpTo = useCallback(
