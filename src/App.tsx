@@ -683,16 +683,22 @@ export default function App() {
           <button type="button" onClick={redo} disabled={!canRedo} title="Ctrl+Y">
             ↪ やり直す
           </button>
-          <button type="button" onClick={newProject}>🗋 新規作成</button>
+          <button type="button" title="新規作成（現在の譜面を破棄）" onClick={newProject}>
+            🗋 新規
+          </button>
           <button
             type="button"
             title="PC版とスマホ版を切り替える"
             onClick={() => selectUiMode(isMobile ? 'pc' : 'mobile')}
           >
-            {isMobile ? '💻 PC版へ' : '📱 スマホ版へ'}
+            {isMobile ? '💻 PC版' : '📱 スマホ版'}
           </button>
-          <button type="button" onClick={() => setDark((d) => !d)}>
-            {dark ? '☀ ライト' : '🌙 ダーク'}
+          <button
+            type="button"
+            title={dark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
+            onClick={() => setDark((d) => !d)}
+          >
+            {dark ? '☀' : '🌙'}
           </button>
         </div>
       </header>
