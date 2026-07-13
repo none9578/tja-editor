@@ -22,7 +22,6 @@ interface Props {
   onToggleEraser: () => void;
   onMove: (dm: number, ds: number) => void;
   onInput: (v: NoteValue) => void;
-  onClear: () => void;
   onUndo: () => void;
   onPlayPause: () => void;
   onStop: () => void;
@@ -42,7 +41,6 @@ export default function MobilePad({
   onToggleEraser,
   onMove,
   onInput,
-  onClear,
   onUndo,
   onPlayPause,
   onStop,
@@ -171,17 +169,8 @@ export default function MobilePad({
             </button>
           );
         })}
-        <button
-          type="button"
-          className="pad-btn"
-          title="空白を置いて次へ（スキップ）"
-          onPointerDown={press(() => onInput(0 as NoteValue))}
-        >
-          空白
-        </button>
-        <button type="button" className="pad-btn" title="カーソル位置を消す" onPointerDown={press(onClear)}>
-          🗑
-        </button>
+        {/* 空白入力は▶（1つ進む）、カーソル位置の消去は↩や消しゴムで代替できる
+            ため、ノーツボタンを大きく保つよう消しゴムだけを置く */}
         <button
           type="button"
           className={`pad-btn ${eraser ? 'active' : ''}`}
