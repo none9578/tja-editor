@@ -40,7 +40,7 @@ function loadLastUiMode(): UiMode | null {
   return v === 'pc' || v === 'mobile' ? v : null;
 }
 
-type Tab = 'edit' | 'overview' | 'play';
+type Tab = 'edit' | 'overview' | 'play' | 'file';
 
 function loadSavedProject(): Project | null {
   try {
@@ -668,6 +668,13 @@ export default function App() {
           >
             🥁 オート再生
           </button>
+          <button
+            type="button"
+            className={tab === 'file' ? 'tab active' : 'tab'}
+            onClick={() => switchTab('file')}
+          >
+            📂 ファイル
+          </button>
         </nav>
         <div className="header-buttons">
           <button type="button" onClick={undo} disabled={!canUndo} title="Ctrl+Z">
@@ -777,8 +784,9 @@ export default function App() {
       )}
 
       {/* フローティング再生バー（スクロールしても常に手が届く）。
-          スマホ編集時は入力パッド側に再生・停止があるため出さない */}
-      {tab !== 'play' && !(isMobile && tab === 'edit') && (
+          スマホ編集時は入力パッド側に再生・停止があるため出さない。
+          ファイルタブは再生と無関係なので出さない */}
+      {(tab === 'overview' || (tab === 'edit' && !isMobile)) && (
         <Transport
           isPlaying={player.isPlaying}
           playhead={player.playhead}
@@ -833,16 +841,25 @@ export default function App() {
             <ValidationPanel issues={issues} />
           </section>
 
-          <section className="panel">
-            <h2>エクスポート / インポート</h2>
-            <ExportPanel project={project} onImport={handleImport} onLoadJson={handleImport} />
-          </section>
-
           <footer className="app-footer">
             キー操作: D=ドン / K=カッ / Shift+D=大ドン / Shift+K=大カッ / R=連打 / Shift+R=大連打 /
             B=風船 / E=終了 / Delete=削除 / 矢印=カーソル移動 / Space=再生・一時停止 / Ctrl+Z=元に戻す
             ／ ドラッグ=ノーツ範囲選択
           </footer>
+        </>
+      )}
+
+      {tab === 'file' && (
+        <>
+          <section className="panel">
+            <h2>エクスポート / インポート</h2>
+            <ExportPanel project={project} onImport={handleImport} onLoadJson={handleImport} />
+          </section>
+
+          <section className="panel">
+            <h2>統計</h2>
+            <StatsBar stats={stats} />
+          </section>
         </>
       )}
 
@@ -870,6 +887,8 @@ export default function App() {
           canUndo={canUndo}
           isPlaying={player.isPlaying}
           playhead={player.playhead}
+          measureCount={project.measures.length}
+          playFromMeasure={playFromMeasure}
           onChangeInputUnit={changeInputUnit}
           onToggleEraser={() => setEraser((x) => !x)}
           onMove={moveCursorBy}
@@ -878,6 +897,8 @@ export default function App() {
           onUndo={undo}
           onPlayPause={() => (player.isPlaying ? player.pause() : handlePlay())}
           onStop={player.stop}
+          onChangePlayFrom={setPlayFromMeasure}
+          onPlayFromTop={() => playFrom(0)}
         />
       )}
 
