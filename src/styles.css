@@ -1271,18 +1271,6 @@ label.inline {
   background: var(--muted);
 }
 
-.ad-slot {
-  margin-top: 20px;
-  min-height: 90px;
-  border: 1px dashed var(--border);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .mode-footnote {
   margin: 14px 0 0;
   font-size: 11px;

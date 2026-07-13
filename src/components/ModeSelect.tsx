@@ -10,7 +10,6 @@ interface Props {
 
 /**
  * 起動時のモード選択画面。
- * 広告を貼る場合は .ad-slot の中身を広告コード（AdSense等）に差し替える。
  */
 export default function ModeSelect({ recommended, last, onSelect }: Props) {
   return (
@@ -38,8 +37,6 @@ export default function ModeSelect({ recommended, last, onSelect }: Props) {
             {last === 'mobile' && recommended !== 'mobile' && <span className="badge last">前回</span>}
           </button>
         </div>
-        {/* 広告スペース: 公開時にAdSense等のコードへ差し替える */}
-        <div className="ad-slot">広告スペース</div>
         <p className="mode-footnote">
           編集データはこのブラウザに自動保存されています。音源や譜面が外部に送信されることはありません。
         </p>

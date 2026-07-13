@@ -49,7 +49,7 @@ src/
     OverviewView.tsx         全体表示タブ（譜面Wiki画像風・小節連結）
     PlayView.tsx             オート再生タブ（canvas。判定・手動プレイ機能は意図的に廃止済み）
     MobilePad.tsx            スマホ版の下部入力パッド（テンポ入力: 置いたら次の線へ進む）
-    ModeSelect.tsx           起動時のPC版/スマホ版選択画面。広告は .ad-slot に差し込む
+    ModeSelect.tsx           起動時のPC版/スマホ版選択画面（広告枠は撤去済み。入れる場合はGit履歴の .ad-slot を復元）
     Transport.tsx            画面下部固定のフローティング再生バー
 ```
 
