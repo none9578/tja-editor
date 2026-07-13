@@ -6,9 +6,22 @@ interface Props {
   project: Project;
   onImport: (project: Project, warnings: string[]) => void;
   onLoadJson: (project: Project) => void;
+  /** 読み込み済み音源の元ファイル（未読み込みならnull） */
+  getAudioFile: () => File | null;
+  onLoadAudio: (file: File) => void;
 }
 
-export default function ExportPanel({ project, onImport, onLoadJson }: Props) {
+/** プロジェクトJSONのファイル形式。音源はbase64のdata URLで埋め込む
+    （音源込みで1ファイルの完全バックアップにする。audioなしの旧形式も読める） */
+type ProjectFile = Project & { audio?: { name: string; dataUrl: string } };
+
+export default function ExportPanel({
+  project,
+  onImport,
+  onLoadJson,
+  getAudioFile,
+  onLoadAudio,
+}: Props) {
   const [preview, setPreview] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [courseChoices, setCourseChoices] = useState<Project[] | null>(null);
@@ -42,20 +55,50 @@ export default function ExportPanel({ project, onImport, onLoadJson }: Props) {
     onImport(p, warnings);
   };
 
-  const saveJson = () => {
+  const saveJson = async () => {
     const name = (project.metadata.title || 'project').replace(/[\\/:*?"<>|]/g, '_');
-    downloadText(JSON.stringify(project, null, 2), `${name}.tjaproj.json`);
+    let audio: ProjectFile['audio'];
+    const file = getAudioFile();
+    if (file) {
+      try {
+        audio = {
+          name: file.name,
+          dataUrl: await new Promise<string>((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result as string);
+            r.onerror = () => reject(r.error as Error);
+            r.readAsDataURL(file);
+          }),
+        };
+      } catch {
+        setWarnings(['音源の読み出しに失敗したため、音源なしで保存しました。']);
+      }
+    }
+    const data: ProjectFile = audio ? { ...project, audio } : project;
+    downloadText(JSON.stringify(data, null, 2), `${name}.tjaproj.json`);
   };
 
   const loadJson = async (file: File) => {
+    let data: ProjectFile;
     try {
-      const data = JSON.parse(await file.text()) as Project;
+      data = JSON.parse(await file.text()) as ProjectFile;
       if (!data.metadata || !Array.isArray(data.measures)) throw new Error('bad format');
-      onLoadJson(data);
-      setWarnings([]);
     } catch {
       setWarnings(['プロジェクトJSONの読み込みに失敗しました。形式を確認してください。']);
+      return;
     }
+    const { audio, ...projectData } = data;
+    onLoadJson(projectData as Project);
+    if (audio?.dataUrl) {
+      try {
+        const buf = await (await fetch(audio.dataUrl)).arrayBuffer();
+        onLoadAudio(new File([buf], audio.name));
+      } catch {
+        setWarnings(['埋め込み音源の復元に失敗しました。音源を読み込み直してください。']);
+        return;
+      }
+    }
+    setWarnings([]);
   };
 
   return (
@@ -68,7 +111,9 @@ export default function ExportPanel({ project, onImport, onLoadJson }: Props) {
         <button type="button" onClick={() => tjaInputRef.current?.click()}>
           ⬆ .tja をインポート
         </button>
-        <button type="button" onClick={saveJson}>プロジェクトJSONを保存</button>
+        <button type="button" onClick={() => void saveJson()}>
+          プロジェクトJSONを保存（音源込み）
+        </button>
         <button type="button" onClick={() => jsonInputRef.current?.click()}>
           プロジェクトJSONを読み込み
         </button>

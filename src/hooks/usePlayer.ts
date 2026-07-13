@@ -42,6 +42,8 @@ export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: num
     ka: null,
   });
   const musicBufRef = useRef<AudioBuffer | null>(null);
+  /** 読み込んだ音源の元ファイル（デコード後も保持し、プロジェクト保存で埋め込む） */
+  const audioFileRef = useRef<File | null>(null);
   const musicGainRef = useRef<GainNode | null>(null);
   const hitGainRef = useRef<GainNode | null>(null);
   const sourcesRef = useRef<AudioBufferSourceNode[]>([]);
@@ -250,15 +252,20 @@ export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: num
         .then((buf) => ctx.decodeAudioData(buf))
         .then((decoded) => {
           musicBufRef.current = decoded;
+          audioFileRef.current = file;
           setAudioInfo({ name: file.name, duration: decoded.duration });
         })
         .catch(() => {
           musicBufRef.current = null;
+          audioFileRef.current = null;
           setAudioInfo(null);
         });
     },
     [ensureCtx, pause],
   );
+
+  /** 読み込み済み音源の元ファイル（プロジェクトJSONへの埋め込み用） */
+  const getAudioFile = useCallback(() => audioFileRef.current, []);
 
   const setHitSoundOn = useCallback((on: boolean) => {
     setHitSoundOnState(on);
@@ -312,6 +319,7 @@ export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: num
     stop,
     seek,
     loadAudioFile,
+    getAudioFile,
     preview,
   };
 }

@@ -883,7 +883,13 @@ export default function App() {
         <>
           <section className="panel">
             <h2>エクスポート / インポート</h2>
-            <ExportPanel project={project} onImport={handleImport} onLoadJson={handleImport} />
+            <ExportPanel
+              project={project}
+              onImport={handleImport}
+              onLoadJson={handleImport}
+              getAudioFile={() => playerRef.current.getAudioFile()}
+              onLoadAudio={(f) => playerRef.current.loadAudioFile(f)}
+            />
           </section>
 
           <section className="panel">
