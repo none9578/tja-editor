@@ -18,6 +18,7 @@ import { HitType, NoteEvent, usePlayer } from './hooks/usePlayer';
 import { useIsMobile } from './hooks/useIsMobile';
 import MobilePad from './components/MobilePad';
 import ModeSelect, { UiMode } from './components/ModeSelect';
+import CopyMenu from './components/CopyMenu';
 import MetadataForm from './components/MetadataForm';
 import OffsetPanel from './components/OffsetPanel';
 import AudioPanel from './components/AudioPanel';
@@ -411,6 +412,25 @@ export default function App() {
       return syncBalloons({ ...p, measures });
     });
   }, [clipboard, selection, commit]);
+
+  /** コピーメニュー: a〜b小節をc〜d小節へ上書き貼り付け（1始まり）。
+      貼り付け先の方が長ければコピー元を繰り返し、譜面末尾を超える分は小節を追加する */
+  const copyRangeTo = useCallback(
+    (a: number, b: number, c: number, d: number) => {
+      commit((p) => {
+        if (a < 1 || b < a || b > p.measures.length || c < 1 || d < c) return p;
+        const src = p.measures.slice(a - 1, b);
+        const measures = [...p.measures];
+        for (let i = 0; i <= d - c; i++) {
+          const di = c - 1 + i;
+          while (measures.length < di) measures.push(createMeasure());
+          measures[di] = cloneMeasure(src[i % src.length]);
+        }
+        return syncBalloons({ ...p, measures });
+      });
+    },
+    [commit],
+  );
 
   const deleteSelection = useCallback(() => {
     if (!selection) return;
@@ -808,6 +828,11 @@ export default function App() {
             >
               小節削除
             </button>
+            <CopyMenu
+              measureCount={project.measures.length}
+              selection={selection}
+              onApply={copyRangeTo}
+            />
           </div>
         </div>
       )}
@@ -896,6 +921,8 @@ export default function App() {
             <h2>統計</h2>
             <StatsBar stats={stats} />
           </section>
+
+          <p className="credit">制作: のー</p>
         </>
       )}
 

@@ -535,6 +535,38 @@ label.inline {
   color: var(--muted);
 }
 
+/* コピーメニュー（選択ツール列の下に全幅で開く） */
+.copy-panel {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+
+.copy-panel input[type='number'] {
+  width: 60px;
+}
+
+.copy-hint {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* 作者表記（控えめに） */
+.credit {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  margin: 4px 0 16px;
+}
+
 /* ==== パレット ==== */
 .palette {
   display: flex;
