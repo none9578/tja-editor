@@ -417,6 +417,12 @@ export default function App() {
       貼り付け先の方が長ければコピー元を繰り返し、譜面末尾を超える分は小節を追加する */
   const copyRangeTo = useCallback(
     (a: number, b: number, c: number, d: number) => {
+      // 貼り付け先に既にノーツがある場合は上書きしてよいか確認する
+      const hasNotes = project.measures
+        .slice(c - 1, d)
+        .some((m) => m.notes.some((v) => v !== 0));
+      if (hasNotes && !window.confirm('貼り付け先の小節にはノーツがあります。上書きしますか？'))
+        return;
       commit((p) => {
         if (a < 1 || b < a || b > p.measures.length || c < 1 || d < c) return p;
         const src = p.measures.slice(a - 1, b);
@@ -429,7 +435,7 @@ export default function App() {
         return syncBalloons({ ...p, measures });
       });
     },
-    [commit],
+    [commit, project],
   );
 
   const deleteSelection = useCallback(() => {
