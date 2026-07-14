@@ -1202,6 +1202,12 @@ label.inline {
   gap: 5px;
 }
 
+/* スマホでは説明テキストを別行に回し、ボタン列を1行に収める */
+.mode-mobile .selection-info {
+  flex-basis: 100%;
+  order: 2;
+}
+
 .mode-mobile .panel {
   padding: 10px 12px;
   border-radius: 12px;

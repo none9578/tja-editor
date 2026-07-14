@@ -438,17 +438,6 @@ export default function App() {
     [commit, project],
   );
 
-  const deleteSelection = useCallback(() => {
-    if (!selection) return;
-    commit((p) => {
-      const measures = p.measures.filter((_, i) => i < selection.start || i > selection.end);
-      return syncBalloons({ ...p, measures: measures.length > 0 ? measures : [createMeasure()] });
-    });
-    setSelection(null);
-    setCursor(null);
-    setNoteSel(null);
-  }, [selection, commit]);
-
   const newProject = useCallback(() => {
     if (!window.confirm('現在の譜面を破棄して新規作成しますか？（自動保存も上書きされます）')) return;
     reset(createProject());
@@ -824,15 +813,7 @@ export default function App() {
               disabled={clipboard.length === 0}
               onClick={pasteClipboard}
             >
-              貼り付け({clipboard.length})
-            </button>
-            <button
-              type="button"
-              className="mini danger"
-              disabled={!selection}
-              onClick={deleteSelection}
-            >
-              小節削除
+              貼り付け
             </button>
             <CopyMenu
               measureCount={project.measures.length}
