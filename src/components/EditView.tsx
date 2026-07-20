@@ -1,9 +1,28 @@
 import { MouseEvent, memo, useCallback, useEffect, useRef } from 'react';
 import { Measure, MeasureSplit } from '../types';
 import { MeasureTiming } from '../utils/timing';
+import { CommandGroup } from '../utils/commands';
 import { inputSlotCount } from '../utils/noteOps';
 import { RollSpan, rollSegmentsForMeasure } from '../utils/rolls';
 import Lane from './Lane';
+
+/** 命令ラベルを譜面の真上に置くトラック（編集・全体で共用） */
+export function CommandTrack({ groups, width }: { groups: CommandGroup[]; width: number }) {
+  if (groups.length === 0) return <div className="cmd-track" />;
+  return (
+    <div className="cmd-track" style={{ width }}>
+      {groups.map((g, i) => (
+        <div key={i} className="cmd-group" style={{ left: width * g.frac }}>
+          {g.texts.map((t, j) => (
+            <span key={j} className="cmd-label">
+              {t}
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export interface MeasurePatch {
   numerator?: number;
@@ -34,6 +53,7 @@ interface RowProps {
   measure: Measure;
   index: number;
   timing: MeasureTiming;
+  commands: CommandGroup[];
   selected: boolean;
   inSelection: boolean;
   inputSlots: number;
@@ -57,6 +77,7 @@ const MeasureRow = memo(function MeasureRow({
   measure,
   index,
   timing,
+  commands,
   selected,
   inSelection,
   inputSlots,
@@ -86,19 +107,18 @@ const MeasureRow = memo(function MeasureRow({
     wasActive.current = active;
   }, [playFraction, isPlaying]);
 
-  const segments = rollSegmentsForMeasure(rollSpans, index);
+  // 矢印などでカーソルがこの小節に入ったら、画面外なら追いかけてスクロールする
+  const hasCursor = cursorK != null;
+  const wasCursor = useRef(false);
+  useEffect(() => {
+    if (hasCursor && !wasCursor.current) {
+      ref.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    wasCursor.current = hasCursor;
+  }, [hasCursor]);
 
-  // 非選択時はヘッダに設定を文字表示するだけにして省スペース化
-  const infoBits: string[] = [];
-  if (measure.numerator !== 4 || measure.denominator !== 4) {
-    infoBits.push(`${measure.numerator}/${measure.denominator}`);
-  }
-  if (measure.bpmOverride != null) infoBits.push(`BPM${measure.bpmOverride}`);
-  if (measure.scrollOverride != null) infoBits.push(`HS${measure.scrollOverride}`);
-  if (measure.gogo) infoBits.push('GOGO');
-  if (!measure.barline) infoBits.push('線OFF');
-  if (measure.delay != null && measure.delay !== 0) infoBits.push(`DELAY${measure.delay}`);
-  if (measure.splits.length > 0) infoBits.push(`区間${measure.splits.length + 1}`);
+  const segments = rollSegmentsForMeasure(rollSpans, index);
+  const laneWidth = BEAT_PX * 4 * (measure.numerator / measure.denominator);
 
   return (
     <div
@@ -109,7 +129,6 @@ const MeasureRow = memo(function MeasureRow({
         <span className="measure-no">#{index + 1}</span>
         <span className="measure-time">{timing.startTime.toFixed(2)}s</span>
         <span className="measure-bpm-label">♩={timing.bpm}</span>
-        {infoBits.length > 0 && <span className="measure-info">{infoBits.join(' ')}</span>}
         <span className="spacer" />
         <button
           type="button"
@@ -158,6 +177,7 @@ const MeasureRow = memo(function MeasureRow({
       </div>
 
       <div className="measure-body">
+        <CommandTrack groups={commands} width={laneWidth} />
         <Lane
           notes={measure.notes}
           numerator={measure.numerator}
@@ -185,6 +205,7 @@ const MeasureRow = memo(function MeasureRow({
 interface EditViewProps {
   measures: Measure[];
   timings: MeasureTiming[];
+  commands: CommandGroup[][];
   rollSpans: RollSpan[];
   balloon: number[];
   inputUnit: number;
@@ -323,6 +344,7 @@ export default function EditView(props: EditViewProps) {
           measure={m}
           index={i}
           timing={timings[i]}
+          commands={props.commands[i] ?? []}
           selected={
             props.selection != null &&
             props.selection.start === props.selection.end &&

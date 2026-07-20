@@ -22,6 +22,7 @@ import CopyMenu from './components/CopyMenu';
 import SideDrawer from './components/SideDrawer';
 import MeasureDetail from './components/MeasureDetail';
 import { saveProjectJson } from './utils/projectFile';
+import { computeMeasureCommands } from './utils/commands';
 import MetadataForm from './components/MetadataForm';
 import OffsetPanel from './components/OffsetPanel';
 import AudioPanel from './components/AudioPanel';
@@ -137,6 +138,7 @@ export default function App() {
   const headerRef = useRef<HTMLElement>(null);
 
   const timings = useMemo(() => computeTimings(project), [project]);
+  const measureCommands = useMemo(() => computeMeasureCommands(project), [project]);
   const chartEnd = useMemo(() => totalDuration(timings), [timings]);
   const issues = useMemo(() => validateProject(project), [project]);
   const stats = useMemo(() => computeStats(project, timings), [project, timings]);
@@ -971,6 +973,7 @@ export default function App() {
             <EditView
               measures={project.measures}
               timings={timings}
+              commands={measureCommands}
               rollSpans={rollSpans}
               balloon={project.metadata.balloon}
               inputUnit={inputUnit}
@@ -1037,6 +1040,7 @@ export default function App() {
           <OverviewView
             measures={project.measures}
             timings={timings}
+            commands={measureCommands}
             rollSpans={rollSpans}
             balloon={project.metadata.balloon}
             playhead={player.playhead}

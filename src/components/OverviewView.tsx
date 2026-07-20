@@ -1,7 +1,9 @@
 import { memo, useEffect, useRef } from 'react';
 import { Measure } from '../types';
 import { MeasureTiming } from '../utils/timing';
+import { CommandGroup } from '../utils/commands';
 import { RollSpan, rollSegmentsForMeasure } from '../utils/rolls';
+import { CommandTrack } from './EditView';
 import Lane from './Lane';
 
 /** 譜面Wiki風の全体表示。コンパクトな小節を並べ、再生位置バーも流れる */
@@ -20,6 +22,7 @@ const MOBILE: Sizes = { beatPx: 29, noteSize: 8, bigSize: 12, laneH: 21 };
 interface ItemProps {
   measure: Measure;
   index: number;
+  commands: CommandGroup[];
   playFraction: number | null;
   isPlaying: boolean;
   rollSpans: RollSpan[];
@@ -33,6 +36,7 @@ interface ItemProps {
 const OverviewMeasure = memo(function OverviewMeasure({
   measure,
   index,
+  commands,
   playFraction,
   isPlaying,
   rollSpans,
@@ -59,6 +63,9 @@ const OverviewMeasure = memo(function OverviewMeasure({
       title={`小節${index + 1}（クリックでこの小節へ）`}
     >
       <span className="ov-no">{index + 1}</span>
+      <div className="ov-cmd">
+        <CommandTrack groups={commands} width={sizes.beatPx * 4 * (measure.numerator / measure.denominator)} />
+      </div>
       <Lane
         notes={measure.notes}
         numerator={measure.numerator}
@@ -80,6 +87,7 @@ const OverviewMeasure = memo(function OverviewMeasure({
 interface Props {
   measures: Measure[];
   timings: MeasureTiming[];
+  commands: CommandGroup[][];
   rollSpans: RollSpan[];
   balloon: number[];
   playhead: number;
@@ -94,6 +102,7 @@ interface Props {
 export default function OverviewView({
   measures,
   timings,
+  commands,
   rollSpans,
   balloon,
   playhead,
@@ -132,6 +141,7 @@ export default function OverviewView({
           key={m.id}
           measure={m}
           index={i}
+          commands={commands[i] ?? []}
           playFraction={i === activeIndex ? fraction : null}
           isPlaying={isPlaying}
           rollSpans={rollSpans}

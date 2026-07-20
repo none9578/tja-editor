@@ -1047,6 +1047,51 @@ label.inline {
   font-weight: bold;
 }
 
+/* 命令ラベル（GOGO/MEASURE/SCROLL等）を譜面の真上に置くトラック */
+.cmd-track {
+  position: relative;
+  height: 14px;
+}
+.cmd-group {
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  flex-direction: column-reverse; /* 複数は下（レーン側）から上へ積む */
+  align-items: flex-start;
+  line-height: 1.15;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.cmd-label {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--accent);
+  /* ヘッダ文字やノーツと重なっても読めるよう薄い下地を敷く */
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  padding: 0 2px;
+  border-radius: 2px;
+}
+/* 全体タブは小節番号より少し小さめ。番号や譜面と重なってもよい */
+.ov-cmd {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.ov-cmd .cmd-track {
+  height: 0;
+}
+.ov-cmd .cmd-group {
+  bottom: auto;
+  top: 0;
+  flex-direction: column;
+}
+.ov-cmd .cmd-label {
+  font-size: 9px;
+  color: var(--accent);
+}
+
 .measure-body {
   /* 左端の線上ノーツ（大ノーツ含む）がはみ出せる余白を確保する */
   padding: 8px 20px;
