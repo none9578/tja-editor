@@ -1299,6 +1299,16 @@ label.inline {
   text-align: center;
 }
 
+/* スマホでは☰を絶対配置にして、独立した1行（＝上の無駄な余白）を作らず
+   タイトルと同じ行の左端に載せる */
+.mode-mobile .drawer-toggle {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  padding: 2px 9px;
+  font-size: 17px;
+}
+
 .mode-mobile .tab-bar {
   /* タブが4つに増えたのでヘッダボタンと同じ行に詰めず、1行を丸ごと使う
      （幅が足りないとタブ内で文字が縦に折り返されてしまう） */
