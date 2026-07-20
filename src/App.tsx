@@ -176,6 +176,8 @@ export default function App() {
               events.push({ time: startT + (dur * i) / (count - 1), type: 'don' });
             }
           }
+          // 風船を割った（連打終了）音を終了位置に鳴らす
+          events.push({ time: endT, type: 'balloon' });
         }
       } else {
         const bpm = timings[s.startM].bpm;

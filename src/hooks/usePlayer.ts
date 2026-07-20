@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export type HitType = 'don' | 'ka' | 'bigDon' | 'bigKa';
+export type HitType = 'don' | 'ka' | 'bigDon' | 'bigKa' | 'balloon';
 
 export interface NoteEvent {
   /** 譜面時刻（秒） */
@@ -37,9 +37,14 @@ export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: num
   const [musicVolume, setMusicVolumeState] = useState(0.5);
 
   const ctxRef = useRef<AudioContext | null>(null);
-  const buffersRef = useRef<{ don: AudioBuffer | null; ka: AudioBuffer | null }>({
+  const buffersRef = useRef<{
+    don: AudioBuffer | null;
+    ka: AudioBuffer | null;
+    balloon: AudioBuffer | null;
+  }>({
     don: null,
     ka: null,
+    balloon: null,
   });
   const musicBufRef = useRef<AudioBuffer | null>(null);
   /** 読み込んだ音源の元ファイル（デコード後も保持し、プロジェクト保存で埋め込む） */
@@ -81,6 +86,8 @@ export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: num
       };
       void load('sounds/don.wav').then((b) => (buffersRef.current.don = b));
       void load('sounds/ka.wav').then((b) => (buffersRef.current.ka = b));
+      // 風船を割った（連打終了）ときの音
+      void load('sounds/balloon.wav').then((b) => (buffersRef.current.balloon = b));
     }
     void ctxRef.current.resume();
     return ctxRef.current;
@@ -186,7 +193,11 @@ export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: num
       for (const e of eventsRef.current) {
         if (e.time < fromChart - 1e-4) continue;
         const buf =
-          e.type === 'don' || e.type === 'bigDon' ? buffersRef.current.don : buffersRef.current.ka;
+          e.type === 'balloon'
+            ? buffersRef.current.balloon
+            : e.type === 'don' || e.type === 'bigDon'
+              ? buffersRef.current.don
+              : buffersRef.current.ka;
         if (!buf) continue;
         const src = ctx.createBufferSource();
         src.buffer = buf;
@@ -284,7 +295,11 @@ export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: num
     (type: HitType) => {
       const ctx = ensureCtx();
       const buf =
-        type === 'don' || type === 'bigDon' ? buffersRef.current.don : buffersRef.current.ka;
+        type === 'balloon'
+          ? buffersRef.current.balloon
+          : type === 'don' || type === 'bigDon'
+            ? buffersRef.current.don
+            : buffersRef.current.ka;
       if (!buf) return;
       const src = ctx.createBufferSource();
       src.buffer = buf;
