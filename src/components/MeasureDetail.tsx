@@ -214,7 +214,7 @@ export default function MeasureDetail({
               {sections.map((sec) => (
                 <div className="mdetail-sec" key={sec.index}>
                   <div
-                    className="mdetail-sec-lane"
+                    className={`mdetail-sec-lane ${sec.gogo ? 'gogo' : ''}`}
                     style={{ width: `${Math.max(6, ((sec.end - sec.start) / len) * 100)}%` }}
                   >
                     {noteDots(sec.start, sec.end)}
