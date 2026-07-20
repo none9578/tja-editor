@@ -47,10 +47,25 @@ export interface Measure {
   barline: boolean;
   /** この小節の頭に挿入する #DELAY 秒（音符が流れてくるのを遅らせる）。null = なし */
   delay: number | null;
+  /**
+   * 小節内の分割点（=小節をサブ区間に切る位置）。各区間は独自のSCROLL/GOGOを持てる。
+   * TJA上では音符列の途中の改行＋#SCROLL/#GOGOに対応する。空 = 分割なし（従来通り1区間）。
+   * 位置はノーツ解像度に依存しないよう小節内の割合(0〜1, 昇順)で保持する。
+   */
+  splits: MeasureSplit[];
   /** 小節内のスロット数（= notes.length）。配置ノーツから自動調整される */
   quantize: number;
   notes: NoteValue[];
-  // 将来の拡張余地: 小節内の途中に命令を差し込む（#SCROLL/#GOGO等の位置付き配列）
+}
+
+/** 小節内のサブ区間の開始点。at より後ろの区間に scroll/gogo を適用する */
+export interface MeasureSplit {
+  /** 小節内の位置（0〜1の割合）。区間の開始点 */
+  at: number;
+  /** この区間頭で適用する #SCROLL。null = 変更しない（直前を継承） */
+  scroll: number | null;
+  /** この区間がゴーゴータイムか */
+  gogo: boolean;
 }
 
 export interface Project {

@@ -765,6 +765,133 @@ label.inline {
   margin: 0;
 }
 
+/* 小節内セクション編集 */
+.mdetail-sections {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mdetail-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mdetail-grid-sel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+/* 分割用の基準レーン */
+.mdetail-ref {
+  position: relative;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+  overflow: hidden;
+}
+.mdetail-ref-notes {
+  position: absolute;
+  inset: 0;
+}
+.mdetail-ref-notes .note,
+.mdetail-sec-lane .note {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+  box-shadow: none;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  outline: 1px solid rgba(0, 0, 0, 0.2);
+}
+/* クリックで区切る目盛線 */
+.mdetail-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  transform: translateX(-50%);
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  z-index: 2;
+}
+.mdetail-tick::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 50%;
+  width: 1px;
+  background: color-mix(in srgb, var(--text) 25%, transparent);
+  transform: translateX(-50%);
+}
+.mdetail-tick:hover::before {
+  background: var(--accent);
+  width: 2px;
+}
+.mdetail-tick.is-split {
+  cursor: default;
+}
+.mdetail-tick.is-split::before {
+  background: var(--accent);
+  width: 2px;
+}
+.mdetail-boundary {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent);
+  transform: translateX(-50%);
+  z-index: 1;
+}
+/* 区間リスト（縦に積む） */
+.mdetail-sec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mdetail-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mdetail-sec-lane {
+  position: relative;
+  height: 28px;
+  min-width: 40px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.mdetail-sec-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.mdetail-sec-ctrl input[type='number'] {
+  width: 64px;
+}
+.mdetail-sec-no {
+  font-weight: bold;
+  min-width: 44px;
+}
+.mdetail-sec-gogo {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
 /* 作者表記（控えめに） */
 .credit {
   text-align: center;

@@ -1,5 +1,6 @@
-import { Measure, Metadata, NoteValue, Project } from '../types';
+import { Measure, MeasureSplit, Metadata, NoteValue, Project } from '../types';
 import { defaultMetadata, uid } from '../project';
+import { getSections } from './sections';
 
 /** 数値を最大3桁小数の文字列にする（TJA出力用） */
 function fmtNum(n: number): string {
@@ -41,10 +42,6 @@ export function generateTja(project: Project): string {
       lines.push(`#BPMCHANGE ${fmtNum(measure.bpmOverride)}`);
       currentBpm = measure.bpmOverride;
     }
-    if (measure.scrollOverride != null && measure.scrollOverride !== currentScroll) {
-      lines.push(`#SCROLL ${fmtNum(measure.scrollOverride)}`);
-      currentScroll = measure.scrollOverride;
-    }
     if (measure.numerator !== currentNum || measure.denominator !== currentDen) {
       lines.push(`#MEASURE ${measure.numerator}/${measure.denominator}`);
       currentNum = measure.numerator;
@@ -54,14 +51,24 @@ export function generateTja(project: Project): string {
       lines.push(measure.barline ? '#BARLINEON' : '#BARLINEOFF');
       currentBarline = measure.barline;
     }
-    if (measure.gogo !== currentGogo) {
-      lines.push(measure.gogo ? '#GOGOSTART' : '#GOGOEND');
-      currentGogo = measure.gogo;
-    }
     if (measure.delay != null && measure.delay !== 0) {
       lines.push(`#DELAY ${fmtNum(measure.delay)}`);
     }
-    lines.push(measure.notes.join('') + ',');
+    // 小節をサブ区間（section）に分けて出力する。区間境界の途中はカンマ無しで改行し、
+    // 各区間の #SCROLL / #GOGO を挟む。最後の区間だけカンマで小節を閉じる。
+    const sections = getSections(measure);
+    sections.forEach((sec, si) => {
+      if (sec.scroll != null && sec.scroll !== currentScroll) {
+        lines.push(`#SCROLL ${fmtNum(sec.scroll)}`);
+        currentScroll = sec.scroll;
+      }
+      if (sec.gogo !== currentGogo) {
+        lines.push(sec.gogo ? '#GOGOSTART' : '#GOGOEND');
+        currentGogo = sec.gogo;
+      }
+      const sub = measure.notes.slice(sec.start, sec.end).join('');
+      lines.push(si === sections.length - 1 ? sub + ',' : sub);
+    });
   }
   if (currentGogo) lines.push('#GOGOEND');
 
@@ -97,11 +104,14 @@ export function parseTja(text: string): ImportResult {
   let pendingBpm: number | null = null;
   let pendingScroll: number | null = null;
   let pendingDelay: number | null = null;
-  let gogo = false;
+  let gogo = false; // 現在のGOGO状態（小節をまたいで継続）
+  let measureGogo = false; // いま組み立て中の小節の「頭」のGOGO
   let barline = true;
   let curNum = 4;
   let curDen = 4;
   let buf = ''; // カンマ待ちの数字列
+  // 小節内の分割点（音符列の途中の#SCROLL/#GOGO）。atSlotは小節頭からの音符数
+  let pendingSplits: { atSlot: number; scroll: number | null; gogo: boolean }[] = [];
 
   const unknownWarned = new Set<string>();
 
@@ -114,21 +124,49 @@ export function parseTja(text: string): ImportResult {
     } else {
       notes = [...clean].map((c) => Number(c) as NoteValue);
     }
+    const len = notes.length;
+    const splits: MeasureSplit[] = [];
+    for (const s of pendingSplits) {
+      if (s.atSlot <= 0 || s.atSlot >= len) continue;
+      splits.push({ at: s.atSlot / len, scroll: s.scroll, gogo: s.gogo });
+    }
     measures.push({
       id: uid(),
       numerator: curNum,
       denominator: curDen,
       bpmOverride: pendingBpm,
       scrollOverride: pendingScroll,
-      gogo,
+      gogo: measureGogo,
       barline,
       delay: pendingDelay,
-      quantize: notes.length,
+      splits,
+      quantize: len,
       notes,
     });
     pendingBpm = null;
     pendingScroll = null;
     pendingDelay = null;
+    pendingSplits = [];
+    // 次の小節の頭GOGOは現在の継続状態
+    measureGogo = gogo;
+  };
+
+  // buf 中の音符数（= 小節内スロット位置）
+  const bufSlot = () => buf.replace(/[^0-8]/g, '').length;
+  // 小節内の途中コマンドを分割点として記録（同じスロットの分割はまとめる）
+  const recordSplit = (patch: { scroll?: number | null; gogo?: boolean }) => {
+    const at = bufSlot();
+    const last = pendingSplits[pendingSplits.length - 1];
+    if (last && last.atSlot === at) {
+      if ('scroll' in patch) last.scroll = patch.scroll ?? null;
+      if ('gogo' in patch) last.gogo = patch.gogo ?? false;
+    } else {
+      pendingSplits.push({
+        atSlot: at,
+        scroll: 'scroll' in patch ? (patch.scroll ?? null) : null,
+        gogo: 'gogo' in patch ? (patch.gogo ?? false) : gogo,
+      });
+    }
   };
 
   const bufHasNotes = () => buf.replace(/[^0-8]/g, '').length > 0;
@@ -158,7 +196,9 @@ export function parseTja(text: string): ImportResult {
         pendingBpm = null;
         pendingScroll = null;
         pendingDelay = null;
+        pendingSplits = [];
         gogo = false;
+        measureGogo = false;
         barline = true;
         curNum = 4;
         curDen = 4;
@@ -246,24 +286,21 @@ export function parseTja(text: string): ImportResult {
       }
       const sMatch = line.match(/^#SCROLL\s+([\d.]+)/i);
       if (sMatch) {
-        if (bufHasNotes()) {
-          warnings.push('小節の途中の #SCROLL は次の小節の先頭に適用します。');
-        }
-        pendingScroll = Number(sMatch[1]);
+        const v = Number(sMatch[1]);
+        if (bufHasNotes()) recordSplit({ scroll: v }); // 小節の途中 = 分割点
+        else pendingScroll = v; // 小節頭
         continue;
       }
       if (/^#GOGOSTART(\s|$)/i.test(line)) {
-        if (bufHasNotes()) {
-          warnings.push('小節の途中の #GOGOSTART は次の小節から適用します。');
-        }
         gogo = true;
+        if (bufHasNotes()) recordSplit({ gogo: true });
+        else measureGogo = true;
         continue;
       }
       if (/^#GOGOEND(\s|$)/i.test(line)) {
-        if (bufHasNotes()) {
-          warnings.push('小節の途中の #GOGOEND は次の小節から適用します。');
-        }
         gogo = false;
+        if (bufHasNotes()) recordSplit({ gogo: false });
+        else measureGogo = false;
         continue;
       }
       if (/^#BARLINEOFF(\s|$)/i.test(line)) {

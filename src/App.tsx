@@ -338,6 +338,7 @@ export default function App() {
         if (patch.gogo != null) next = { ...next, gogo: patch.gogo };
         if (patch.barline != null) next = { ...next, barline: patch.barline };
         if ('delay' in patch) next = { ...next, delay: patch.delay ?? null };
+        if ('splits' in patch) next = { ...next, splits: patch.splits ?? [] };
         const measures = [...p.measures];
         measures[mi] = next;
         return syncBalloons({ ...p, measures });

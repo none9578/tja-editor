@@ -1,5 +1,5 @@
 import { MouseEvent, memo, useCallback, useEffect, useRef } from 'react';
-import { Measure } from '../types';
+import { Measure, MeasureSplit } from '../types';
 import { MeasureTiming } from '../utils/timing';
 import { inputSlotCount } from '../utils/noteOps';
 import { RollSpan, rollSegmentsForMeasure } from '../utils/rolls';
@@ -13,6 +13,7 @@ export interface MeasurePatch {
   gogo?: boolean;
   barline?: boolean;
   delay?: number | null;
+  splits?: MeasureSplit[];
 }
 
 /** ノーツ範囲選択（小節番号と小節内割合のペア、正規化済み: a <= b） */
@@ -97,6 +98,7 @@ const MeasureRow = memo(function MeasureRow({
   if (measure.gogo) infoBits.push('GOGO');
   if (!measure.barline) infoBits.push('線OFF');
   if (measure.delay != null && measure.delay !== 0) infoBits.push(`DELAY${measure.delay}`);
+  if (measure.splits.length > 0) infoBits.push(`区間${measure.splits.length + 1}`);
 
   return (
     <div

@@ -48,8 +48,13 @@ export function computeTimings(project: Project): MeasureTiming[] {
     // #DELAY はこの小節（以降）の音符が流れてくるのを遅らせる = 開始時刻を後ろへずらす
     if (m.delay != null) t += m.delay;
     const duration = (60 / bpm) * 4 * (m.numerator / m.denominator);
+    // timing.scroll は小節頭のSCROLL（小節内の途中変化は当面オート再生に反映しない）
     const timing: MeasureTiming = { startTime: t, duration, bpm, scroll };
     t += duration;
+    // 小節内の途中SCROLLは、最後の値を次の小節の継承スクロールへ引き継ぐ
+    for (const sp of [...m.splits].sort((a, b) => a.at - b.at)) {
+      if (sp.scroll != null && sp.scroll > 0) scroll = sp.scroll;
+    }
     return timing;
   });
 }

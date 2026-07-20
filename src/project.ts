@@ -39,6 +39,7 @@ export function createMeasure(
     gogo: false,
     barline: true,
     delay: null,
+    splits: [],
     quantize,
     notes: new Array<NoteValue>(quantize).fill(0),
   };
@@ -58,6 +59,11 @@ export function normalizeProject(p: Project): Project {
       gogo: m.gogo ?? false,
       barline: m.barline ?? true,
       delay: m.delay ?? null,
+      splits: Array.isArray(m.splits)
+        ? m.splits
+            .filter((s) => typeof s?.at === 'number' && s.at > 0 && s.at < 1)
+            .map((s) => ({ at: s.at, scroll: s.scroll ?? null, gogo: !!s.gogo }))
+        : [],
       quantize: m.notes?.length || 16,
       notes: Array.isArray(m.notes) && m.notes.length > 0 ? m.notes : new Array<NoteValue>(16).fill(0),
     })),
@@ -72,9 +78,9 @@ export function createProject(): Project {
   };
 }
 
-/** 小節の複製（idは新規採番） */
+/** 小節の複製（idは新規採番）。notes・splitsは配列なので複製する */
 export function cloneMeasure(m: Measure): Measure {
-  return { ...m, id: uid(), notes: [...m.notes] };
+  return { ...m, id: uid(), notes: [...m.notes], splits: m.splits.map((s) => ({ ...s })) };
 }
 
 /**
