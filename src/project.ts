@@ -37,6 +37,8 @@ export function createMeasure(
     bpmOverride: null,
     scrollOverride: null,
     gogo: false,
+    barline: true,
+    delay: null,
     quantize,
     notes: new Array<NoteValue>(quantize).fill(0),
   };
@@ -54,6 +56,8 @@ export function normalizeProject(p: Project): Project {
       bpmOverride: m.bpmOverride ?? null,
       scrollOverride: m.scrollOverride ?? null,
       gogo: m.gogo ?? false,
+      barline: m.barline ?? true,
+      delay: m.delay ?? null,
       quantize: m.notes?.length || 16,
       notes: Array.isArray(m.notes) && m.notes.length > 0 ? m.notes : new Array<NoteValue>(16).fill(0),
     })),

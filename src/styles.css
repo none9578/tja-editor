@@ -686,6 +686,85 @@ label.inline {
   font-size: 11px;
 }
 
+/* ==== 小節詳細モーダル ==== */
+.mdetail-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 70;
+}
+.mdetail {
+  position: fixed;
+  z-index: 71;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(460px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  padding: 14px 16px;
+}
+.mdetail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+.mdetail-head .spacer {
+  flex: 1;
+}
+.mdetail-title {
+  font-weight: bold;
+  font-size: 15px;
+}
+.mdetail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mdetail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mdetail-label {
+  font-weight: bold;
+  font-size: 13px;
+}
+.mdetail-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mdetail-control input[type='number'] {
+  width: 90px;
+}
+.mdetail-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: bold;
+}
+.mdetail-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+.mdetail-note {
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin: 0;
+}
+
 /* 作者表記（控えめに） */
 .credit {
   text-align: center;

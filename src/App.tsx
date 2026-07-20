@@ -20,6 +20,7 @@ import MobilePad from './components/MobilePad';
 import ModeSelect, { UiMode } from './components/ModeSelect';
 import CopyMenu from './components/CopyMenu';
 import SideDrawer from './components/SideDrawer';
+import MeasureDetail from './components/MeasureDetail';
 import { saveProjectJson } from './utils/projectFile';
 import MetadataForm from './components/MetadataForm';
 import OffsetPanel from './components/OffsetPanel';
@@ -119,6 +120,8 @@ export default function App() {
   const [clipboard, setClipboard] = useState<Measure[]>([]);
   const [playFromMeasure, setPlayFromMeasure] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // 小節詳細モーダルで開いている小節の番号（null = 閉じている）
+  const [detailIndex, setDetailIndex] = useState<number | null>(null);
   const [dark, setDark] = useState(() => localStorage.getItem(THEME_KEY) === 'dark');
   const [calibration, setCalibration] = useState(loadCalibration);
   // 画面モードは自動判定せず、起動時にユーザーが選ぶ（nullの間は選択画面を表示）
@@ -333,6 +336,8 @@ export default function App() {
         if ('scrollOverride' in patch)
           next = { ...next, scrollOverride: patch.scrollOverride ?? null };
         if (patch.gogo != null) next = { ...next, gogo: patch.gogo };
+        if (patch.barline != null) next = { ...next, barline: patch.barline };
+        if ('delay' in patch) next = { ...next, delay: patch.delay ?? null };
         const measures = [...p.measures];
         measures[mi] = next;
         return syncBalloons({ ...p, measures });
@@ -345,7 +350,7 @@ export default function App() {
     commit((p) => {
       const last = p.measures[p.measures.length - 1];
       const m = last
-        ? { ...createMeasure(16, last.numerator, last.denominator), gogo: last.gogo }
+        ? { ...createMeasure(16, last.numerator, last.denominator), gogo: last.gogo, barline: last.barline }
         : createMeasure();
       return { ...p, measures: [...p.measures, m] };
     });
@@ -356,7 +361,7 @@ export default function App() {
       commit((p) => {
         const base = p.measures[mi];
         const m = base
-          ? { ...createMeasure(16, base.numerator, base.denominator), gogo: base.gogo }
+          ? { ...createMeasure(16, base.numerator, base.denominator), gogo: base.gogo, barline: base.barline }
           : createMeasure();
         const measures = [...p.measures];
         measures.splice(mi + 1, 0, m);
@@ -845,6 +850,18 @@ export default function App() {
         onToggleTheme={() => setDark((d) => !d)}
       />
 
+      {detailIndex != null && project.measures[detailIndex] && (
+        <MeasureDetail
+          index={detailIndex}
+          measureCount={project.measures.length}
+          measure={project.measures[detailIndex]}
+          timing={timings[detailIndex]}
+          onChange={(patch) => changeMeasure(detailIndex, patch)}
+          onNav={setDetailIndex}
+          onClose={() => setDetailIndex(null)}
+        />
+      )}
+
       {tab === 'edit' && (
         <div className="top-panels">
           <PanelSection title="曲情報（TJAメタデータ）" mobile={isMobile}>
@@ -972,11 +989,10 @@ export default function App() {
                 if (cur) syncPlayToCursor(cur);
               }}
               onSelectMeasure={selectMeasureWithCursor}
-              onChangeMeasure={changeMeasure}
               onDuplicate={duplicateMeasure}
               onDelete={deleteMeasure}
               onInsertAfter={insertAfter}
-              onPlayFrom={playFrom}
+              onOpenDetail={setDetailIndex}
               onAddMeasure={addMeasure}
             />
           </section>

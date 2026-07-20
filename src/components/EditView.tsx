@@ -11,6 +11,8 @@ export interface MeasurePatch {
   bpmOverride?: number | null;
   scrollOverride?: number | null;
   gogo?: boolean;
+  barline?: boolean;
+  delay?: number | null;
 }
 
 /** ノーツ範囲選択（小節番号と小節内割合のペア、正規化済み: a <= b） */
@@ -44,11 +46,10 @@ interface RowProps {
   onLaneMove: (mi: number, frac: number, e: MouseEvent) => void;
   onLaneContext: (mi: number, frac: number) => void;
   onSelectMeasure: (mi: number, shiftKey: boolean) => void;
-  onChangeMeasure: (mi: number, patch: MeasurePatch) => void;
   onDuplicate: (mi: number) => void;
   onDelete: (mi: number) => void;
   onInsertAfter: (mi: number) => void;
-  onPlayFrom: (mi: number) => void;
+  onOpenDetail: (mi: number) => void;
 }
 
 const MeasureRow = memo(function MeasureRow({
@@ -68,11 +69,10 @@ const MeasureRow = memo(function MeasureRow({
   onLaneMove,
   onLaneContext,
   onSelectMeasure,
-  onChangeMeasure,
   onDuplicate,
   onDelete,
   onInsertAfter,
-  onPlayFrom,
+  onOpenDetail,
 }: RowProps) {
   const ref = useRef<HTMLDivElement>(null);
   const wasActive = useRef(false);
@@ -95,6 +95,8 @@ const MeasureRow = memo(function MeasureRow({
   if (measure.bpmOverride != null) infoBits.push(`BPM${measure.bpmOverride}`);
   if (measure.scrollOverride != null) infoBits.push(`HS${measure.scrollOverride}`);
   if (measure.gogo) infoBits.push('GOGO');
+  if (!measure.barline) infoBits.push('線OFF');
+  if (measure.delay != null && measure.delay !== 0) infoBits.push(`DELAY${measure.delay}`);
 
   return (
     <div
@@ -110,13 +112,13 @@ const MeasureRow = memo(function MeasureRow({
         <button
           type="button"
           className="mini"
-          title="この小節から再生"
+          title="この小節の詳細設定（拍子・BPM・SCROLL・ゴーゴー・小節線・DELAY）"
           onClick={(e) => {
             e.stopPropagation();
-            onPlayFrom(index);
+            onOpenDetail(index);
           }}
         >
-          ▶
+          ⚙ 詳細
         </button>
         <button
           type="button"
@@ -174,90 +176,6 @@ const MeasureRow = memo(function MeasureRow({
         />
       </div>
 
-      {selected && (
-        <div className="measure-footer">
-          <label>
-            拍子
-            <input
-              type="number"
-              min={1}
-              max={32}
-              step={1}
-              value={measure.numerator}
-              onChange={(e) => onChangeMeasure(index, { numerator: Number(e.target.value) })}
-            />
-            /
-            <input
-              type="number"
-              min={1}
-              max={32}
-              step={1}
-              value={measure.denominator}
-              onChange={(e) => onChangeMeasure(index, { denominator: Number(e.target.value) })}
-            />
-          </label>
-          <label>
-            BPM
-            <input
-              type="number"
-              min={1}
-              step={1}
-              placeholder={`${timing.bpm}`}
-              value={measure.bpmOverride ?? ''}
-              title="空欄 = 直前の小節のBPMを引き継ぐ"
-              onChange={(e) =>
-                onChangeMeasure(index, {
-                  bpmOverride: e.target.value === '' ? null : Number(e.target.value),
-                })
-              }
-            />
-            {measure.bpmOverride != null && (
-              <button
-                type="button"
-                className="mini"
-                title="BPM変更を解除して基準に戻す"
-                onClick={() => onChangeMeasure(index, { bpmOverride: null })}
-              >
-                解除
-              </button>
-            )}
-          </label>
-          <label>
-            SCROLL
-            <input
-              type="number"
-              min={0.1}
-              step={0.1}
-              placeholder={`${timing.scroll}`}
-              value={measure.scrollOverride ?? ''}
-              title="空欄 = 直前のSCROLLを引き継ぐ（初期値1）"
-              onChange={(e) =>
-                onChangeMeasure(index, {
-                  scrollOverride: e.target.value === '' ? null : Number(e.target.value),
-                })
-              }
-            />
-            {measure.scrollOverride != null && (
-              <button
-                type="button"
-                className="mini"
-                onClick={() => onChangeMeasure(index, { scrollOverride: null })}
-              >
-                解除
-              </button>
-            )}
-          </label>
-          <label className="gogo-toggle" title="この小節をゴーゴータイムにする（#GOGOSTART/#GOGOENDで出力）">
-            <input
-              type="checkbox"
-              checked={measure.gogo}
-              onChange={(e) => onChangeMeasure(index, { gogo: e.target.checked })}
-            />
-            ゴーゴー
-          </label>
-          <span className="tja-div">TJA分割: {measure.notes.length}</span>
-        </div>
-      )}
     </div>
   );
 });
@@ -282,11 +200,10 @@ interface EditViewProps {
   onNoteSelChange: (sel: NoteSelection | null) => void;
   onCursorChange: (cur: { measure: number; slot: number } | null) => void;
   onSelectMeasure: (mi: number, shiftKey: boolean) => void;
-  onChangeMeasure: (mi: number, patch: MeasurePatch) => void;
   onDuplicate: (mi: number) => void;
   onDelete: (mi: number) => void;
   onInsertAfter: (mi: number) => void;
-  onPlayFrom: (mi: number) => void;
+  onOpenDetail: (mi: number) => void;
   onAddMeasure: () => void;
 }
 
@@ -423,11 +340,10 @@ export default function EditView(props: EditViewProps) {
           onLaneMove={handleLaneMove}
           onLaneContext={handleLaneContext}
           onSelectMeasure={props.onSelectMeasure}
-          onChangeMeasure={props.onChangeMeasure}
           onDuplicate={props.onDuplicate}
           onDelete={props.onDelete}
           onInsertAfter={props.onInsertAfter}
-          onPlayFrom={props.onPlayFrom}
+          onOpenDetail={props.onOpenDetail}
         />
       ))}
       <button type="button" className="add-measure" onClick={props.onAddMeasure}>

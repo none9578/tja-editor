@@ -43,11 +43,14 @@ export interface Measure {
   scrollOverride: number | null;
   /** この小節がゴーゴータイム中かどうか（#GOGOSTART/#GOGOENDに変換される） */
   gogo: boolean;
+  /** この小節の頭の小節線（縦線）を表示するか。false → #BARLINEOFF */
+  barline: boolean;
+  /** この小節の頭に挿入する #DELAY 秒（音符が流れてくるのを遅らせる）。null = なし */
+  delay: number | null;
   /** 小節内のスロット数（= notes.length）。配置ノーツから自動調整される */
   quantize: number;
   notes: NoteValue[];
-  // 将来の拡張用（分岐・DELAYなど）はここにフィールドを追加する
-  // 例: delay?: number | null;
+  // 将来の拡張余地: 小節内の途中に命令を差し込む（#SCROLL/#GOGO等の位置付き配列）
 }
 
 export interface Project {

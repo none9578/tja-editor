@@ -35,6 +35,7 @@ export function generateTja(project: Project): string {
   let currentNum = 4;
   let currentDen = 4;
   let currentGogo = false;
+  let currentBarline = true;
   for (const measure of project.measures) {
     if (measure.bpmOverride != null && measure.bpmOverride !== currentBpm) {
       lines.push(`#BPMCHANGE ${fmtNum(measure.bpmOverride)}`);
@@ -49,9 +50,16 @@ export function generateTja(project: Project): string {
       currentNum = measure.numerator;
       currentDen = measure.denominator;
     }
+    if (measure.barline !== currentBarline) {
+      lines.push(measure.barline ? '#BARLINEON' : '#BARLINEOFF');
+      currentBarline = measure.barline;
+    }
     if (measure.gogo !== currentGogo) {
       lines.push(measure.gogo ? '#GOGOSTART' : '#GOGOEND');
       currentGogo = measure.gogo;
+    }
+    if (measure.delay != null && measure.delay !== 0) {
+      lines.push(`#DELAY ${fmtNum(measure.delay)}`);
     }
     lines.push(measure.notes.join('') + ',');
   }
@@ -73,7 +81,8 @@ export interface ImportResult {
 /**
  * TJAテキストをパースする。
  * 対応: 主要ヘッダ / SONGVOL / SEVOL / DEMOSTART / #START / #END /
- *       #MEASURE / #BPMCHANGE / #SCROLL / #GOGOSTART / #GOGOEND / 小節の数字列 /
+ *       #MEASURE / #BPMCHANGE / #SCROLL / #GOGOSTART / #GOGOEND /
+ *       #BARLINEOFF / #BARLINEON / #DELAY / 小節の数字列 /
  *       複数コース（COURSEごとに #START〜#END を繰り返す形式）
  * 未対応のコマンド・ヘッダは警告を出して無視する。
  */
@@ -87,7 +96,9 @@ export function parseTja(text: string): ImportResult {
   let measures: Measure[] = [];
   let pendingBpm: number | null = null;
   let pendingScroll: number | null = null;
+  let pendingDelay: number | null = null;
   let gogo = false;
+  let barline = true;
   let curNum = 4;
   let curDen = 4;
   let buf = ''; // カンマ待ちの数字列
@@ -110,11 +121,14 @@ export function parseTja(text: string): ImportResult {
       bpmOverride: pendingBpm,
       scrollOverride: pendingScroll,
       gogo,
+      barline,
+      delay: pendingDelay,
       quantize: notes.length,
       notes,
     });
     pendingBpm = null;
     pendingScroll = null;
+    pendingDelay = null;
   };
 
   const bufHasNotes = () => buf.replace(/[^0-8]/g, '').length > 0;
@@ -143,7 +157,9 @@ export function parseTja(text: string): ImportResult {
         // コースごとに譜面状態をリセット
         pendingBpm = null;
         pendingScroll = null;
+        pendingDelay = null;
         gogo = false;
+        barline = true;
         curNum = 4;
         curDen = 4;
         buf = '';
@@ -248,6 +264,22 @@ export function parseTja(text: string): ImportResult {
           warnings.push('小節の途中の #GOGOEND は次の小節から適用します。');
         }
         gogo = false;
+        continue;
+      }
+      if (/^#BARLINEOFF(\s|$)/i.test(line)) {
+        if (bufHasNotes()) warnings.push('小節の途中の #BARLINEOFF は次の小節から適用します。');
+        barline = false;
+        continue;
+      }
+      if (/^#BARLINEON(\s|$)/i.test(line)) {
+        if (bufHasNotes()) warnings.push('小節の途中の #BARLINEON は次の小節から適用します。');
+        barline = true;
+        continue;
+      }
+      const dMatch = line.match(/^#DELAY\s+(-?[\d.]+)/i);
+      if (dMatch) {
+        if (bufHasNotes()) warnings.push('小節の途中の #DELAY は次の小節の先頭に適用します。');
+        pendingDelay = Number(dMatch[1]);
         continue;
       }
       const cmd = line.split(/\s/)[0];

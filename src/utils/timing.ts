@@ -45,6 +45,8 @@ export function computeTimings(project: Project): MeasureTiming[] {
   return project.measures.map((m) => {
     if (m.bpmOverride != null && m.bpmOverride > 0) bpm = m.bpmOverride;
     if (m.scrollOverride != null && m.scrollOverride > 0) scroll = m.scrollOverride;
+    // #DELAY はこの小節（以降）の音符が流れてくるのを遅らせる = 開始時刻を後ろへずらす
+    if (m.delay != null) t += m.delay;
     const duration = (60 / bpm) * 4 * (m.numerator / m.denominator);
     const timing: MeasureTiming = { startTime: t, duration, bpm, scroll };
     t += duration;
