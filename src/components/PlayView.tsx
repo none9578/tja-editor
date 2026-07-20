@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Project } from '../types';
 import { MeasureTiming } from '../utils/timing';
 import { RollSpan } from '../utils/rolls';
+import { getSections } from '../utils/sections';
 import { NoteEvent, Player } from '../hooks/usePlayer';
 
 /**
@@ -21,6 +22,8 @@ interface LaneNote {
   time: number;
   value: 1 | 2 | 3 | 4;
   mi: number;
+  /** この位置で有効なSCROLL（小節内変化を反映） */
+  scroll: number;
 }
 
 interface RollDraw {
@@ -29,6 +32,8 @@ interface RollDraw {
   type: 5 | 6 | 7;
   count: number | null;
   mi: number;
+  scrollStart: number;
+  scrollEnd: number;
 }
 
 interface Props {
@@ -61,6 +66,54 @@ export default function PlayView({
     [timings],
   );
 
+  // 小節内も含めた SCROLL / GOGO の状態変化点（時刻→値）。TJAと同じ走行状態で算出する。
+  const { scrollPoints, gogoPoints } = useMemo(() => {
+    const sp: { time: number; value: number }[] = [];
+    const gp: { time: number; value: boolean }[] = [];
+    let scroll = 1;
+    let gogo = false;
+    project.measures.forEach((m, mi) => {
+      for (const sec of getSections(m)) {
+        const t = timeAt(mi, sec.startFrac);
+        if (sec.scroll != null && sec.scroll > 0 && sec.scroll !== scroll) {
+          scroll = sec.scroll;
+          sp.push({ time: t, value: scroll });
+        }
+        if (sec.gogo !== gogo) {
+          gogo = sec.gogo;
+          gp.push({ time: t, value: gogo });
+        }
+      }
+    });
+    return { scrollPoints: sp, gogoPoints: gp };
+  }, [project, timeAt]);
+
+  /** 指定時刻で有効なSCROLL（直前の変化点の値、無ければ1） */
+  const scrollAt = useCallback(
+    (time: number) => {
+      let v = 1;
+      for (const p of scrollPoints) {
+        if (p.time <= time + 1e-6) v = p.value;
+        else break;
+      }
+      return v;
+    },
+    [scrollPoints],
+  );
+
+  /** 指定時刻で有効なGOGO */
+  const gogoAt = useCallback(
+    (time: number) => {
+      let v = false;
+      for (const p of gogoPoints) {
+        if (p.time <= time + 1e-6) v = p.value;
+        else break;
+      }
+      return v;
+    },
+    [gogoPoints],
+  );
+
   // レーンに流れる通常ノーツ（1〜4）
   const laneNotes = useMemo<LaneNote[]>(() => {
     const notes: LaneNote[] = [];
@@ -68,25 +121,38 @@ export default function PlayView({
       const q = m.notes.length;
       m.notes.forEach((v, j) => {
         if (v >= 1 && v <= 4) {
-          notes.push({ time: timeAt(mi, j / q), value: v as 1 | 2 | 3 | 4, mi });
+          const time = timeAt(mi, j / q);
+          notes.push({ time, value: v as 1 | 2 | 3 | 4, mi, scroll: scrollAt(time) });
         }
       });
     });
     notes.sort((a, b) => a.time - b.time);
     return notes;
-  }, [project, timeAt]);
+  }, [project, timeAt, scrollAt]);
 
   // 連打・風船の帯
   const rollDraws = useMemo<RollDraw[]>(
     () =>
-      rollSpans.map((s) => ({
-        start: timeAt(s.startM, s.startF),
-        end: timeAt(s.endM, s.endF),
-        type: s.type,
-        count: s.type === 7 ? (project.metadata.balloon[s.balloonIndex] ?? 5) : null,
-        mi: s.startM,
-      })),
-    [rollSpans, project, timeAt],
+      rollSpans.map((s) => {
+        const start = timeAt(s.startM, s.startF);
+        const end = timeAt(s.endM, s.endF);
+        return {
+          start,
+          end,
+          type: s.type,
+          count: s.type === 7 ? (project.metadata.balloon[s.balloonIndex] ?? 5) : null,
+          mi: s.startM,
+          scrollStart: scrollAt(start),
+          scrollEnd: scrollAt(end),
+        };
+      }),
+    [rollSpans, project, timeAt, scrollAt],
+  );
+
+  // 各小節頭で有効なSCROLL（小節線の位置計算に使う）
+  const measureScrolls = useMemo(
+    () => timings.map((t) => scrollAt(t.startTime)),
+    [timings, scrollAt],
   );
 
   const start = useCallback(() => {
@@ -167,15 +233,8 @@ export default function PlayView({
       // 縦画面はノーツが判定枠に届くまでの距離を稼ぐため判定枠を左に寄せる
       const hitX = mobile ? 44 : 110;
 
-      // 現在の小節（ゴーゴー判定）
-      let inGogo = false;
-      for (let i = 0; i < timings.length; i++) {
-        const t = timings[i];
-        if (now >= t.startTime && now < t.startTime + t.duration) {
-          inGogo = project.measures[i]?.gogo ?? false;
-          break;
-        }
-      }
+      // ゴーゴー判定（小節内の切り替えも反映）
+      const inGogo = gogoAt(now);
 
       // 背景
       ctx.fillStyle = '#171512';
@@ -186,19 +245,21 @@ export default function PlayView({
       ctx.fillRect(0, laneY, W, 8);
       ctx.fillRect(0, laneY + laneH - 8, W, 8);
 
-      const speedOf = (t: MeasureTiming) => (t.bpm / 60) * ppb * t.scroll;
+      // 速さ = (BPM/60) × ppb × SCROLL。SCROLLは対象の位置の値を使う（小節内変化を反映）
+      const speedAt = (bpm: number, scroll: number) => (bpm / 60) * ppb * scroll;
 
-      // 小節線
+      // 小節線（#BARLINEOFFの小節は引かない）
       ctx.strokeStyle = '#5c574f';
       ctx.lineWidth = 2;
-      for (const t of timings) {
-        const x = hitX + (t.startTime - now) * speedOf(t);
-        if (x < -10 || x > W + 10) continue;
+      timings.forEach((t, i) => {
+        if (!(project.measures[i]?.barline ?? true)) return;
+        const x = hitX + (t.startTime - now) * speedAt(t.bpm, measureScrolls[i]);
+        if (x < -10 || x > W + 10) return;
         ctx.beginPath();
         ctx.moveTo(x, laneY + 8);
         ctx.lineTo(x, laneY + laneH - 8);
         ctx.stroke();
-      }
+      });
 
       // 判定枠
       ctx.strokeStyle = '#b8b0a0';
@@ -236,8 +297,8 @@ export default function PlayView({
       // 連打・風船の帯（終端が判定枠を過ぎるまで表示）
       for (const r of rollDraws) {
         const t1 = timings[r.mi];
-        const x1 = Math.max(hitX, hitX + (r.start - now) * speedOf(t1));
-        const x2 = hitX + (r.end - now) * speedOf(t1);
+        const x1 = Math.max(hitX, hitX + (r.start - now) * speedAt(t1.bpm, r.scrollStart));
+        const x2 = hitX + (r.end - now) * speedAt(t1.bpm, r.scrollEnd);
         if (x2 < hitX - 10 || x1 > W + 60) continue;
         const rad = r.type === 6 ? bigR : noteR;
         if (r.type === 7) {
@@ -263,7 +324,7 @@ export default function PlayView({
         const n = laneNotes[i];
         if (n.time <= now) continue; // 叩かれた分は飛翔側で描く
         const t = timings[n.mi];
-        const x = hitX + (n.time - now) * speedOf(t);
+        const x = hitX + (n.time - now) * speedAt(t.bpm, n.scroll);
         if (x < -50 || x > W + 50) continue;
         const big = n.value === 3 || n.value === 4;
         const don = n.value === 1 || n.value === 3;
@@ -330,7 +391,7 @@ export default function PlayView({
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [player, timings, chartEnd, project, laneNotes, rollDraws, events]);
+  }, [player, timings, chartEnd, project, laneNotes, rollDraws, events, measureScrolls, gogoAt]);
 
   return (
     <div className="play-view">
