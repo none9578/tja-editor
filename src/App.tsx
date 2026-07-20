@@ -818,7 +818,7 @@ export default function App() {
           <button type="button" onClick={redo} disabled={!canRedo} title="Ctrl+Y">
             ↪ やり直す
           </button>
-          {tab === 'edit' && (
+          {(tab === 'edit' || tab === 'overview') && (
             <CopyMenu
               measureCount={project.measures.length}
               selection={selection}
