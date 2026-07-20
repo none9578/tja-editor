@@ -1088,8 +1088,9 @@ label.inline {
   flex-direction: column;
 }
 .ov-cmd .cmd-label {
-  font-size: 9px;
+  font-size: 8px;
   color: var(--accent);
+  padding: 0 1px;
 }
 
 .measure-body {
@@ -1338,6 +1339,8 @@ label.inline {
   font-size: 10px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  /* 小節番号は命令ラベルより前面に重ねる */
+  z-index: 6;
 }
 
 .ov-measure .lane {
