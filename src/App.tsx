@@ -504,6 +504,18 @@ export default function App() {
     syncCursorToPlayhead();
   }, [syncCursorToPlayhead]);
 
+  /** 小節ヘッダのクリック等での小節選択: カーソルと再生開始位置もその小節頭へ移す */
+  const selectMeasureWithCursor = useCallback(
+    (mi: number, shiftKey: boolean) => {
+      selectMeasure(mi, shiftKey);
+      if (shiftKey) return; // Shiftでの範囲拡張ではカーソルは動かさない
+      const cur = { measure: mi, slot: 0 };
+      setCursor(cur);
+      syncPlayToCursor(cur);
+    },
+    [selectMeasure, syncPlayToCursor],
+  );
+
   // タブ切替時は再生を止める（キー操作や自動音の競合を避ける）。
   // 再生中だった場合はカーソルを停止位置へ合わせてから切り替える
   const switchTab = useCallback(
@@ -927,7 +939,7 @@ export default function App() {
                 setCursor(cur);
                 if (cur) syncPlayToCursor(cur);
               }}
-              onSelectMeasure={selectMeasure}
+              onSelectMeasure={selectMeasureWithCursor}
               onChangeMeasure={changeMeasure}
               onDuplicate={duplicateMeasure}
               onDelete={deleteMeasure}

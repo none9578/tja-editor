@@ -307,8 +307,8 @@ export default function EditView(props: EditViewProps) {
       const slots = slotsOf(mi);
       const k = Math.min(slots - 1, Math.max(0, Math.round(frac * slots)));
       dragRef.current = { mi, k, frac, moved: false };
-      props.onCursorChange({ measure: mi, slot: k });
       if (e.shiftKey && props.cursor) {
+        props.onCursorChange({ measure: mi, slot: k });
         // Shift+クリック: カーソル位置から範囲選択
         const a = { m: props.cursor.measure, f: props.cursor.slot / slotsOf(props.cursor.measure) };
         const b = { m: mi, f: k / slots };
@@ -319,6 +319,8 @@ export default function EditView(props: EditViewProps) {
       }
       props.onNoteSelChange(null);
       props.onSelectMeasure(mi, false);
+      // 小節選択でカーソルは小節頭へ移るため、クリックした線の位置は最後に上書きする
+      props.onCursorChange({ measure: mi, slot: k });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [slotsOf, props.onCursorChange, props.onNoteSelChange, props.onSelectMeasure, props.cursor],
