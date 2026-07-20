@@ -125,6 +125,7 @@ export function parseTja(text: string): ImportResult {
       pushMeasure('');
     }
     courses.push({
+      name: '',
       metadata: { ...meta, balloon: [...meta.balloon] },
       measures,
     });
@@ -278,7 +279,7 @@ export function parseTja(text: string): ImportResult {
     warnings.push('#START が見つかりませんでした。譜面本体は読み込まれていません。');
     measures = [];
     pushMeasure('');
-    courses.push({ metadata: { ...meta, balloon: [...meta.balloon] }, measures });
+    courses.push({ name: '', metadata: { ...meta, balloon: [...meta.balloon] }, measures });
   }
   for (const c of courses) {
     if (!c.metadata.title) c.metadata.title = '(無題)';

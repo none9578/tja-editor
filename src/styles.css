@@ -329,6 +329,126 @@ textarea:focus {
   flex-wrap: wrap;
 }
 
+/* ==== 左スライドのメニュードロワー ==== */
+.drawer-toggle {
+  font-size: 18px;
+  line-height: 1;
+  padding: 6px 11px;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 60;
+}
+.drawer-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(320px, 84vw);
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.18);
+  transform: translateX(-100%);
+  transition: transform 0.22s ease;
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.drawer-title {
+  font-weight: bold;
+  font-size: 15px;
+}
+.drawer-close {
+  padding: 4px 10px;
+}
+
+.drawer-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.drawer-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.drawer-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.drawer-row {
+  display: flex;
+  gap: 6px;
+}
+.drawer-row input {
+  flex: 1;
+  min-width: 0;
+}
+.drawer-hint,
+.drawer-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.drawer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.drawer-actions button {
+  width: 100%;
+  text-align: left;
+}
+
+.drawer-help summary {
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 13px;
+}
+.drawer-usage {
+  font-size: 12px;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+.drawer-keys {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.drawer-about p {
+  font-size: 12px;
+  margin: 2px 0;
+}
+
 /* ==== パネル ==== */
 .panel {
   background: var(--panel);
@@ -535,18 +655,25 @@ label.inline {
   color: var(--muted);
 }
 
-/* コピーメニュー（選択ツール列の下に全幅で開く） */
+/* コピーメニュー（ヘッダの元に戻す/やり直す横のボタンから、
+   ヘッダ直下に全幅ドロップダウンで開く） */
 .copy-panel {
-  flex-basis: 100%;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  z-index: 40;
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   font-size: 12px;
-  padding: 6px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--text) 3%, transparent);
+  background: var(--panel);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 }
 
 .copy-panel input[type='number'] {

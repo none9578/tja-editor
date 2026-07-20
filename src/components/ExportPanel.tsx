@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { Project } from '../types';
-import { downloadBlob, downloadText, generateTja, parseTja } from '../utils/tja';
+import { downloadBlob, generateTja, parseTja } from '../utils/tja';
 import { makeZip } from '../utils/zip';
+import { fileBaseName, ProjectFile, saveProjectJson } from '../utils/projectFile';
 
 interface Props {
   project: Project;
@@ -11,10 +12,6 @@ interface Props {
   getAudioFile: () => File | null;
   onLoadAudio: (file: File) => void;
 }
-
-/** プロジェクトJSONのファイル形式。音源はbase64のdata URLで埋め込む
-    （音源込みで1ファイルの完全バックアップにする。audioなしの旧形式も読める） */
-type ProjectFile = Project & { audio?: { name: string; dataUrl: string } };
 
 export default function ExportPanel({
   project,
@@ -34,8 +31,7 @@ export default function ExportPanel({
   const download = () => {
     const text = generateTja(project);
     setPreview(text);
-    const name = (project.metadata.title || 'chart').replace(/[\\/:*?"<>|]/g, '_');
-    downloadText(text, `${name}.tja`);
+    downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), `${fileBaseName(project)}.tja`);
   };
 
   /** 読み込んだ音源ファイルをそのままダウンロードする */
@@ -50,7 +46,7 @@ export default function ExportPanel({
     if (!f) return;
     const text = generateTja(project);
     setPreview(text);
-    const name = (project.metadata.title || 'chart').replace(/[\\/:*?"<>|]/g, '_');
+    const name = fileBaseName(project);
     const zip = makeZip([
       { name: `${name}.tja`, data: new TextEncoder().encode(text) },
       { name: f.name, data: new Uint8Array(await f.arrayBuffer()) },
@@ -77,26 +73,8 @@ export default function ExportPanel({
   };
 
   const saveJson = async () => {
-    const name = (project.metadata.title || 'project').replace(/[\\/:*?"<>|]/g, '_');
-    let audio: ProjectFile['audio'];
-    const file = getAudioFile();
-    if (file) {
-      try {
-        audio = {
-          name: file.name,
-          dataUrl: await new Promise<string>((resolve, reject) => {
-            const r = new FileReader();
-            r.onload = () => resolve(r.result as string);
-            r.onerror = () => reject(r.error as Error);
-            r.readAsDataURL(file);
-          }),
-        };
-      } catch {
-        setWarnings(['音源の読み出しに失敗したため、音源なしで保存しました。']);
-      }
-    }
-    const data: ProjectFile = audio ? { ...project, audio } : project;
-    downloadText(JSON.stringify(data, null, 2), `${name}.tjaproj.json`);
+    const w = await saveProjectJson(project, getAudioFile());
+    setWarnings(w ? [w] : []);
   };
 
   const loadJson = async (file: File) => {

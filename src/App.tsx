@@ -19,6 +19,8 @@ import { useIsMobile } from './hooks/useIsMobile';
 import MobilePad from './components/MobilePad';
 import ModeSelect, { UiMode } from './components/ModeSelect';
 import CopyMenu from './components/CopyMenu';
+import SideDrawer from './components/SideDrawer';
+import { saveProjectJson } from './utils/projectFile';
 import MetadataForm from './components/MetadataForm';
 import OffsetPanel from './components/OffsetPanel';
 import AudioPanel from './components/AudioPanel';
@@ -116,6 +118,7 @@ export default function App() {
   const [noteSel, setNoteSel] = useState<NoteSelection | null>(null);
   const [clipboard, setClipboard] = useState<Measure[]>([]);
   const [playFromMeasure, setPlayFromMeasure] = useState(1);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [dark, setDark] = useState(() => localStorage.getItem(THEME_KEY) === 'dark');
   const [calibration, setCalibration] = useState(loadCalibration);
   // 画面モードは自動判定せず、起動時にユーザーが選ぶ（nullの間は選択画面を表示）
@@ -246,6 +249,19 @@ export default function App() {
     },
     [commit],
   );
+
+  const renameProject = useCallback(
+    (name: string) => {
+      commit((p) => ({ ...p, name }));
+    },
+    [commit],
+  );
+
+  /** ドロワーからの保存（音源込みJSON）。失敗時のみ警告を出す */
+  const saveProjectFile = useCallback(async () => {
+    const w = await saveProjectJson(project, playerRef.current.getAudioFile());
+    if (w) window.alert(w);
+  }, [project]);
 
   /** 入力単位のk番目の線にノーツを配置 */
   const placeAt = useCallback(
@@ -756,6 +772,14 @@ export default function App() {
       className={`app ${isMobile ? 'mode-mobile' : ''} ${isMobile && tab === 'edit' ? 'with-pad' : ''}`}
     >
       <header className="app-header" ref={headerRef}>
+        <button
+          type="button"
+          className="drawer-toggle"
+          title="メニューを開く"
+          onClick={() => setDrawerOpen(true)}
+        >
+          ☰
+        </button>
         <h1>TJA譜面エディタ</h1>
         <nav className="tab-bar">
           <button
@@ -794,25 +818,32 @@ export default function App() {
           <button type="button" onClick={redo} disabled={!canRedo} title="Ctrl+Y">
             ↪ やり直す
           </button>
-          <button type="button" title="新規作成（現在の譜面を破棄）" onClick={newProject}>
-            🗋 新規
-          </button>
-          <button
-            type="button"
-            title="PC版とスマホ版を切り替える"
-            onClick={() => selectUiMode(isMobile ? 'pc' : 'mobile')}
-          >
-            {isMobile ? '💻 PC版' : '📱 スマホ版'}
-          </button>
-          <button
-            type="button"
-            title={dark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
-            onClick={() => setDark((d) => !d)}
-          >
-            {dark ? '☀' : '🌙'}
-          </button>
+          {tab === 'edit' && (
+            <CopyMenu
+              measureCount={project.measures.length}
+              selection={selection}
+              onApply={copyRangeTo}
+            />
+          )}
         </div>
       </header>
+
+      <SideDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        projectName={project.name}
+        titleFallback={project.metadata.title}
+        onRename={renameProject}
+        onSave={() => void saveProjectFile()}
+        onNew={() => {
+          setDrawerOpen(false);
+          newProject();
+        }}
+        isMobile={isMobile}
+        onToggleUiMode={() => selectUiMode(isMobile ? 'pc' : 'mobile')}
+        dark={dark}
+        onToggleTheme={() => setDark((d) => !d)}
+      />
 
       {tab === 'edit' && (
         <div className="top-panels">
@@ -877,22 +908,23 @@ export default function App() {
                 選択ノーツを削除
               </button>
             )}
-            <button type="button" className="mini" disabled={!selection} onClick={copySelection}>
-              小節コピー
-            </button>
-            <button
-              type="button"
-              className="mini"
-              disabled={clipboard.length === 0}
-              onClick={pasteClipboard}
-            >
-              貼り付け
-            </button>
-            <CopyMenu
-              measureCount={project.measures.length}
-              selection={selection}
-              onApply={copyRangeTo}
-            />
+            {/* 小節コピー/貼り付けはPC版のみ。スマホは範囲指定できるコピーメニュー
+                （ヘッダの元に戻す/やり直す横）に集約する */}
+            {!isMobile && (
+              <>
+                <button type="button" className="mini" disabled={!selection} onClick={copySelection}>
+                  小節コピー
+                </button>
+                <button
+                  type="button"
+                  className="mini"
+                  disabled={clipboard.length === 0}
+                  onClick={pasteClipboard}
+                >
+                  貼り付け
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -959,11 +991,6 @@ export default function App() {
             <ValidationPanel issues={issues} />
           </section>
 
-          <footer className="app-footer">
-            キー操作: D=ドン / K=カッ / Shift+D=大ドン / Shift+K=大カッ / R=連打 / Shift+R=大連打 /
-            B=風船 / E=終了 / Delete=削除 / 矢印=カーソル移動 / Space=再生・一時停止 / Ctrl+Z=元に戻す
-            ／ ドラッグ=ノーツ範囲選択
-          </footer>
         </>
       )}
 
@@ -984,8 +1011,6 @@ export default function App() {
             <h2>統計</h2>
             <StatsBar stats={stats} />
           </section>
-
-          <p className="credit">制作: のー</p>
         </>
       )}
 

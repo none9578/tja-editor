@@ -45,6 +45,7 @@ export function createMeasure(
 /** 旧バージョンの保存データ・外部JSONを現行の形に揃える */
 export function normalizeProject(p: Project): Project {
   return {
+    name: p.name ?? '',
     metadata: { ...defaultMetadata(), ...p.metadata },
     measures: p.measures.map((m) => ({
       id: m.id || uid(),
@@ -61,6 +62,7 @@ export function normalizeProject(p: Project): Project {
 
 export function createProject(): Project {
   return {
+    name: '',
     metadata: defaultMetadata(),
     measures: [createMeasure(), createMeasure(), createMeasure(), createMeasure()],
   };

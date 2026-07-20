@@ -51,6 +51,8 @@ export interface Measure {
 }
 
 export interface Project {
+  /** プロジェクト名（保存ファイル名の元になる）。空なら曲名(title)を使う */
+  name: string;
   metadata: Metadata;
   measures: Measure[];
 }
