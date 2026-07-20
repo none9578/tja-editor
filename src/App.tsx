@@ -1,7 +1,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Measure, Metadata, NoteValue, Project } from './types';
 import { cloneMeasure, createMeasure, createProject, normalizeProject, uid } from './project';
-import { computeTimings, totalDuration } from './utils/timing';
+import { computeTimings, measureIndexAt, totalDuration } from './utils/timing';
 import { validateProject } from './utils/validation';
 import { computeStats } from './utils/stats';
 import {
@@ -218,12 +218,6 @@ export default function App() {
     }, 500);
     return () => clearTimeout(t);
   }, [project]);
-
-  // タブ切替時は再生を止める（キー操作や自動音の競合を避ける）
-  const switchTab = useCallback((next: Tab) => {
-    playerRef.current.pause();
-    setTab(next);
-  }, []);
 
   // 入力単位の変更: カーソルの「小節内の位置」を保ったまま、新単位の最寄りの線に載せ替える
   const changeInputUnit = useCallback(
@@ -458,6 +452,69 @@ export default function App() {
     [reset],
   );
 
+  // ---- 編集カーソルと再生位置の統一 ----
+  // カーソル移動（停止中）→ 再生開始位置が追従し、▶でそこから再生。
+  // 一時停止/停止 → カーソルが停止位置の最寄りの線へ移動し、そこから配置を続けられる。
+
+  /** カーソル線の譜面時刻 */
+  const cursorChartTime = useCallback(
+    (cur: { measure: number; slot: number }) => {
+      const t = timings[cur.measure];
+      if (!t) return 0;
+      const slots = inputSlotCount(project.measures[cur.measure], inputUnit);
+      return t.startTime + (t.duration * cur.slot) / slots;
+    },
+    [timings, project, inputUnit],
+  );
+
+  /** 停止中ならカーソル位置に再生開始位置を追従させる */
+  const syncPlayToCursor = useCallback(
+    (cur: { measure: number; slot: number }) => {
+      if (playerRef.current.isPlaying) return;
+      playerRef.current.seek(cursorChartTime(cur));
+      setPlayFromMeasure(cur.measure + 1);
+    },
+    [cursorChartTime],
+  );
+
+  /** 現在の再生位置の最寄りの線へカーソルを合わせる */
+  const syncCursorToPlayhead = useCallback(() => {
+    const ph = playerRef.current.playheadRef.current;
+    const mi = measureIndexAt(timings, ph);
+    if (mi == null) return;
+    const t = timings[mi];
+    const slots = inputSlotCount(project.measures[mi], inputUnit);
+    const k = Math.min(
+      slots - 1,
+      Math.max(0, Math.round(((ph - t.startTime) / t.duration) * slots)),
+    );
+    setCursor({ measure: mi, slot: k });
+    selectMeasure(mi, false);
+  }, [timings, project, inputUnit, selectMeasure]);
+
+  /** 一時停止して編集カーソルを停止位置へ合わせる */
+  const pauseAndSync = useCallback(() => {
+    playerRef.current.pause();
+    syncCursorToPlayhead();
+  }, [syncCursorToPlayhead]);
+
+  /** 停止（再生開始位置に戻る）して編集カーソルも合わせる */
+  const stopAndSync = useCallback(() => {
+    playerRef.current.stop();
+    syncCursorToPlayhead();
+  }, [syncCursorToPlayhead]);
+
+  // タブ切替時は再生を止める（キー操作や自動音の競合を避ける）。
+  // 再生中だった場合はカーソルを停止位置へ合わせてから切り替える
+  const switchTab = useCallback(
+    (next: Tab) => {
+      if (playerRef.current.isPlaying) pauseAndSync();
+      else playerRef.current.pause();
+      setTab(next);
+    },
+    [pauseAndSync],
+  );
+
   // ---- カーソル操作（キーボードとスマホ用パッドで共有） ----
   /** 入力単位の線に沿ってカーソルを移動する。小節が変われば小節選択も追従 */
   const moveCursorBy = useCallback(
@@ -481,8 +538,9 @@ export default function App() {
       }
       setCursor({ measure: m, slot: s });
       if (m !== base.measure || !cursor) selectMeasure(m, false);
+      syncPlayToCursor({ measure: m, slot: s });
     },
-    [cursor, project, inputUnit, selectMeasure],
+    [cursor, project, inputUnit, selectMeasure, syncPlayToCursor],
   );
 
   /** カーソル位置にノーツを置いて次の線へ進む（テンポ入力） */
@@ -501,8 +559,9 @@ export default function App() {
         } else s = cur.slot;
       }
       setCursor({ measure: m, slot: s });
+      syncPlayToCursor({ measure: m, slot: s });
     },
-    [cursor, project, inputUnit, placeAt, selectMeasure],
+    [cursor, project, inputUnit, placeAt, selectMeasure, syncPlayToCursor],
   );
 
   /** カーソル位置のノーツを消す（進まない） */
@@ -547,8 +606,9 @@ export default function App() {
       if (!t) return;
       setPlayFromMeasure(target + 1);
       playerRef.current.seek(t.startTime);
+      syncCursorToPlayhead();
     },
-    [playFromMeasure, timings],
+    [playFromMeasure, timings, syncCursorToPlayhead],
   );
 
   const jumpTo = useCallback(
@@ -608,7 +668,7 @@ export default function App() {
 
       if (e.key === ' ') {
         e.preventDefault();
-        if (playerRef.current.isPlaying) playerRef.current.pause();
+        if (playerRef.current.isPlaying) pauseAndSync();
         else handlePlay();
         return;
       }
@@ -665,6 +725,7 @@ export default function App() {
     copySelection,
     pasteClipboard,
     handlePlay,
+    pauseAndSync,
   ]);
 
   // 起動直後はモード選択画面（広告スペース付き）を表示する
@@ -835,8 +896,8 @@ export default function App() {
           playFromMeasure={playFromMeasure}
           onChangePlayFrom={setPlayFromMeasure}
           onPlay={handlePlay}
-          onPause={player.pause}
-          onStop={player.stop}
+          onPause={tab === 'edit' ? pauseAndSync : player.pause}
+          onStop={tab === 'edit' ? stopAndSync : player.stop}
           onPlayFromTop={() => playFrom(0)}
         />
       )}
@@ -862,7 +923,10 @@ export default function App() {
               onPlaceAt={placeAt}
               onEraseAt={eraseAt}
               onNoteSelChange={setNoteSel}
-              onCursorChange={setCursor}
+              onCursorChange={(cur) => {
+                setCursor(cur);
+                if (cur) syncPlayToCursor(cur);
+              }}
               onSelectMeasure={selectMeasure}
               onChangeMeasure={changeMeasure}
               onDuplicate={duplicateMeasure}
@@ -925,6 +989,7 @@ export default function App() {
             showPlayhead={player.isPlaying || player.playhead > 0}
             isPlaying={player.isPlaying}
             isMobile={isMobile}
+            focusIndex={cursor?.measure ?? (selection ? selection.start : playFromMeasure - 1)}
             onJump={jumpTo}
           />
         </section>
@@ -943,8 +1008,8 @@ export default function App() {
           onInput={inputAtCursor}
           onClear={clearAtCursor}
           onUndo={undo}
-          onPlayPause={() => (player.isPlaying ? player.pause() : handlePlay())}
-          onStop={player.stop}
+          onPlayPause={() => (player.isPlaying ? pauseAndSync() : handlePlay())}
+          onStop={stopAndSync}
           onChangePlayFrom={setPlayFromMeasure}
           onStepMeasure={stepPlayMeasure}
         />

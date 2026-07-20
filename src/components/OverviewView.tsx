@@ -86,6 +86,8 @@ interface Props {
   showPlayhead: boolean;
   isPlaying: boolean;
   isMobile: boolean;
+  /** 表示した瞬間にスクロールして見せる小節（編集タブと同じ小節にフォーカスする） */
+  focusIndex: number;
   onJump: (mi: number) => void;
 }
 
@@ -98,9 +100,18 @@ export default function OverviewView({
   showPlayhead,
   isPlaying,
   isMobile,
+  focusIndex,
   onJump,
 }: Props) {
   const sizes = isMobile ? MOBILE : DESKTOP;
+
+  // タブを開いた瞬間だけフォーカス小節へスクロール（再生中の追従は各小節側が担当）
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = listRef.current?.children[focusIndex] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: 'center' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   let activeIndex = -1;
   let fraction = 0;
   if (showPlayhead) {
@@ -115,7 +126,7 @@ export default function OverviewView({
   }
 
   return (
-    <div className="overview">
+    <div className="overview" ref={listRef}>
       {measures.map((m, i) => (
         <OverviewMeasure
           key={m.id}
