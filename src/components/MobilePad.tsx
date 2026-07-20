@@ -108,11 +108,14 @@ export default function MobilePad({
             ))}
           </select>
           <span className="pad-time">{fmtTime(playhead)}</span>
+          {/* モード切替はパッドの高さが変わるため、pointerdownではなくclickで処理する。
+              pointerdownで即切替すると、指を離した時にブラウザが合成するclickが
+              ずれた後のレイアウトの別要素（小節の×ボタン等）に命中してしまう */}
           <button
             type="button"
             className="pad-btn pad-toggle"
             title="編集操作に戻る"
-            onPointerDown={press(() => setPadMode('edit'))}
+            onClick={() => setPadMode('edit')}
           >
             ✏ 編集
           </button>
@@ -154,11 +157,12 @@ export default function MobilePad({
         <button type="button" className="pad-btn" disabled={!canUndo} title="元に戻す" onPointerDown={press(onUndo)}>
           ↩
         </button>
+        {/* clickで処理する理由は✏編集ボタン側のコメント参照 */}
         <button
           type="button"
           className={`pad-btn pad-toggle ${isPlaying ? 'pad-playing' : ''}`}
           title="再生操作に切り替え"
-          onPointerDown={press(() => setPadMode('play'))}
+          onClick={() => setPadMode('play')}
         >
           🎵 再生
         </button>
