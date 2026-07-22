@@ -131,7 +131,8 @@ export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: num
       ? musicBufRef.current.duration + offsetRef.current
       : 0;
     const end = Math.max(chartEndRef.current, musicEndChart);
-    if (chart > end + 0.3) {
+    // 譜面の終わりで急に止めず、助走と同じくらいの余韻（空レーンが流れる時間）を残す
+    if (chart > end + 1.8) {
       stopSources();
       stopTicker();
       isPlayingRef.current = false;

@@ -20,6 +20,10 @@ export interface ExportOptions {
   audio: ExportAudio;
   fromTime: number;
   toTime: number;
+  /** 開始前の助走（秒）。この間に音をフェードインしつつ譜面が流れ込む */
+  leadIn: number;
+  /** 終了後の余韻（秒）。この間に音をフェードアウトしながら流し続ける */
+  outro: number;
   width: number;
   height: number;
   fps?: number;
@@ -46,13 +50,11 @@ function pickMime(): { mime: string; ext: string } | null {
   return null;
 }
 
-const FLY_TAIL = 0.6; // 最後の飛翔演出が終わるまでの余白（秒）
-
 export async function exportPlayVideo(
   opts: ExportOptions,
 ): Promise<{ blob: Blob; ext: string }> {
-  const { data, events, audio, fromTime, toTime, width, height } = opts;
-  const fps = opts.fps ?? 30;
+  const { data, events, audio, fromTime, toTime, leadIn, outro, width, height } = opts;
+  const fps = opts.fps ?? 60;
   const picked = pickMime();
   if (!picked) throw new Error('このブラウザは動画の録画に対応していません。');
 
@@ -63,26 +65,34 @@ export async function exportPlayVideo(
   const layout = exportLayout(width, height);
   opts.onCanvas?.(canvas); // ミニプレーヤーとして画面に出せるよう渡す
 
-  // 音声（曲＋太鼓音）をMediaStreamへ流す（monitor時はスピーカーにも）
+  // 時間構成: [startNow=fromTime-leadIn] 助走 [fromTime] 本編 [toTime] 余韻 [endNow=toTime+outro]
+  const startNow = fromTime - leadIn;
+  const endNow = toTime + outro;
+
   const ac = new AudioContext();
   await ac.resume();
   const dest = ac.createMediaStreamDestination();
   const monitor = opts.monitor !== false;
-  const sinkOf = (node: AudioNode) => {
-    node.connect(dest);
-    if (monitor) node.connect(ac.destination);
-  };
-  const t0 = ac.currentTime + 0.25; // スケジューリング余裕
-  const chartToAc = (chart: number) => t0 + (chart - fromTime);
+  const t0 = ac.currentTime + 0.25; // now=startNow に対応するオーディオ時刻
+  const chartToAc = (chart: number) => t0 + (chart - startNow);
+
+  // 全音声を通すマスターゲイン。助走でフェードイン・余韻でフェードアウト
+  const master = ac.createGain();
+  master.connect(dest);
+  if (monitor) master.connect(ac.destination);
+  master.gain.setValueAtTime(leadIn > 0 ? 0 : 1, t0);
+  if (leadIn > 0) master.gain.linearRampToValueAtTime(1, chartToAc(fromTime));
+  master.gain.setValueAtTime(1, chartToAc(toTime));
+  if (outro > 0) master.gain.linearRampToValueAtTime(0, chartToAc(endNow));
 
   if (audio.music && audio.musicVolume > 0) {
     const g = ac.createGain();
     g.gain.value = audio.musicVolume;
-    sinkOf(g);
+    g.connect(master);
     const src = ac.createBufferSource();
     src.buffer = audio.music;
     src.connect(g);
-    const fromAudio = fromTime - audio.offset; // 同期補正
+    const fromAudio = startNow - audio.offset; // 助走ぶんも含めて頭出し
     if (fromAudio >= 0) {
       if (fromAudio < audio.music.duration) src.start(t0, fromAudio);
     } else {
@@ -91,7 +101,7 @@ export async function exportPlayVideo(
   }
   if (audio.hitSoundOn) {
     for (const e of events) {
-      if (e.time < fromTime - 1e-4 || e.time > toTime + 1e-4) continue;
+      if (e.time < startNow - 1e-4 || e.time > endNow + 1e-4) continue;
       const buf =
         e.type === 'balloon'
           ? audio.buffers.balloon
@@ -103,8 +113,7 @@ export async function exportPlayVideo(
       src.buffer = buf;
       const g = ac.createGain();
       g.gain.value = e.type === 'bigDon' || e.type === 'bigKa' ? 1.25 : 1;
-      src.connect(g);
-      sinkOf(g);
+      src.connect(g).connect(master);
       src.start(chartToAc(e.time));
     }
   }
@@ -128,16 +137,17 @@ export async function exportPlayVideo(
 
   await new Promise<void>((resolve) => {
     let raf = 0;
+    const total = endNow - startNow;
     const tick = () => {
-      const now = fromTime + (ac.currentTime - t0);
+      const now = startNow + (ac.currentTime - t0);
       renderPlayFrame(
         ctx,
         { W: width, H: height, now, isPlaying: true, started: true },
         layout,
         data,
       );
-      opts.onProgress?.(Math.min(1, Math.max(0, (now - fromTime) / (toTime - fromTime))));
-      if (now >= toTime + FLY_TAIL) {
+      opts.onProgress?.(Math.min(1, Math.max(0, (now - startNow) / total)));
+      if (now >= endNow) {
         cancelAnimationFrame(raf);
         resolve();
         return;

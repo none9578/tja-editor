@@ -53,12 +53,18 @@ export default function ExportPanel({
   const [progress, setProgress] = useState(0);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  // 選んだ範囲の再生時間（＝おおよその書き出し時間）
+  // 選んだ範囲＋助走＋余韻の合計時間（＝おおよその書き出し時間）
   const rangeA = Math.max(1, Math.min(vidFrom, measureCount));
   const rangeB = Math.max(rangeA, Math.min(vidTo, measureCount));
+  const leadIn = timings.length > 0 ? Math.min(3, Math.max(1.5, timings[rangeA - 1].duration)) : 1.5;
+  const outro = timings.length > 0 ? Math.min(3, Math.max(1.5, timings[rangeB - 1].duration)) : 1.5;
   const estSec =
     timings.length > 0
-      ? timings[rangeB - 1].startTime + timings[rangeB - 1].duration - timings[rangeA - 1].startTime
+      ? timings[rangeB - 1].startTime +
+        timings[rangeB - 1].duration -
+        timings[rangeA - 1].startTime +
+        leadIn +
+        outro
       : 0;
   const fmtSec = (s: number) => {
     const n = Math.max(0, Math.ceil(s));
@@ -80,6 +86,8 @@ export default function ExportPanel({
         audio: getExportAudio(),
         fromTime,
         toTime,
+        leadIn,
+        outro,
         width: size.w,
         height: size.h,
         bitrate: size.bitrate,
