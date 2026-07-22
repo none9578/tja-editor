@@ -92,7 +92,7 @@ export default function ExportPanel({
         height: size.h,
         bitrate: size.bitrate,
         onProgress: setProgress,
-        onCanvas: (cv) => {
+        onPreview: (cv) => {
           const box = previewRef.current;
           if (!box) return;
           box.innerHTML = '';
