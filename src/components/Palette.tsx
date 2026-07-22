@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { INPUT_UNIT_OPTIONS, NOTE_VALUES, NoteValue } from '../types';
 import { NOTE_INFO } from '../noteInfo';
 import { HitType } from '../hooks/usePlayer';
@@ -32,6 +33,24 @@ export default function Palette({
   onChangeInputUnit,
   onPreview,
 }: Props) {
+  // プリセットに無い値（＝「その他」で指定した任意の N）を使っているかどうか。
+  // 入力単位は素の数値なので、エンジンはもともと 2〜128 の任意の分母を扱える。
+  const isPreset = INPUT_UNIT_OPTIONS.includes(inputUnit);
+  const [customOpen, setCustomOpen] = useState(!isPreset);
+  const [customText, setCustomText] = useState(String(inputUnit));
+
+  // 打ち替えやすいよう入力欄は文字列で保持し、2〜128 の範囲に収まった時だけ反映する
+  const applyCustom = (raw: string) => {
+    setCustomText(raw);
+    const n = Math.floor(Number(raw));
+    if (Number.isFinite(n) && n >= 2 && n <= 128) onChangeInputUnit(n);
+  };
+  const commitCustom = () => {
+    const n = Math.min(128, Math.max(2, Math.floor(Number(customText) || inputUnit)));
+    setCustomText(String(n));
+    onChangeInputUnit(n);
+  };
+
   return (
     <div className="palette">
       {NOTE_VALUES.map((v) => {
@@ -74,9 +93,16 @@ export default function Palette({
       <label className="input-unit">
         入力単位
         <select
-          value={inputUnit}
+          value={customOpen ? 'other' : inputUnit}
           onChange={(e) => {
-            onChangeInputUnit(Number(e.target.value));
+            const v = e.target.value;
+            if (v === 'other') {
+              setCustomOpen(true);
+              setCustomText(String(inputUnit));
+            } else {
+              setCustomOpen(false);
+              onChangeInputUnit(Number(v));
+            }
             // フォーカスが残ると矢印キーで単位が変わってしまうため外す
             (e.currentTarget as HTMLSelectElement).blur();
           }}
@@ -86,7 +112,21 @@ export default function Palette({
               {u}分
             </option>
           ))}
+          <option value="other">その他</option>
         </select>
+        {customOpen && (
+          <span className="input-unit-custom">
+            <input
+              type="number"
+              min={2}
+              max={128}
+              value={customText}
+              onChange={(e) => applyCustom(e.target.value)}
+              onBlur={commitCustom}
+            />
+            分（2〜128）
+          </span>
+        )}
         <span className="input-unit-hint">TJAの分割は配置から自動調整</span>
       </label>
     </div>

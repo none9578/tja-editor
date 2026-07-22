@@ -166,6 +166,19 @@ body {
   touch-action: manipulation;
 }
 
+/* 「その他」選択時の任意入力単位（2〜128）欄 */
+.pad-unit-custom {
+  flex: 1;
+  max-width: 64px;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  text-align: center;
+  font-weight: bold;
+  touch-action: manipulation;
+}
+
 .pad-time {
   flex: 1.2;
   max-width: 84px;
@@ -1287,6 +1300,21 @@ label.inline {
 
 .input-unit-hint {
   font-size: 10px;
+}
+
+/* 「その他」で任意の入力単位を指定する数値欄 */
+.input-unit-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.input-unit-custom input {
+  width: 56px;
+  font-weight: bold;
+  text-align: right;
 }
 
 /* ==== 全体表示（小節を隙間なく連結してWiki譜面画像風にする） ==== */

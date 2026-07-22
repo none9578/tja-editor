@@ -47,6 +47,19 @@ export default function MobilePad({
   onStepMeasure,
 }: Props) {
   const [padMode, setPadMode] = useState<'edit' | 'play'>('edit');
+  // 「その他」で 2〜128 の任意の入力単位を指定できるようにする
+  const [customOpen, setCustomOpen] = useState(!INPUT_UNIT_OPTIONS.includes(inputUnit));
+  const [customText, setCustomText] = useState(String(inputUnit));
+  const applyCustom = (raw: string) => {
+    setCustomText(raw);
+    const n = Math.floor(Number(raw));
+    if (Number.isFinite(n) && n >= 2 && n <= 128) onChangeInputUnit(n);
+  };
+  const commitCustom = () => {
+    const n = Math.min(128, Math.max(2, Math.floor(Number(customText) || inputUnit)));
+    setCustomText(String(n));
+    onChangeInputUnit(n);
+  };
 
   // pointerdownで即時反応させる（clickの遅延やフォーカス移動を避ける）
   const press = (fn: () => void) => (e: PointerEvent) => {
@@ -141,10 +154,17 @@ export default function MobilePad({
         </button>
         <select
           className="pad-unit"
-          value={inputUnit}
+          value={customOpen ? 'other' : inputUnit}
           title="入力単位"
           onChange={(e) => {
-            onChangeInputUnit(Number(e.target.value));
+            const v = e.target.value;
+            if (v === 'other') {
+              setCustomOpen(true);
+              setCustomText(String(inputUnit));
+            } else {
+              setCustomOpen(false);
+              onChangeInputUnit(Number(v));
+            }
             e.currentTarget.blur();
           }}
         >
@@ -153,7 +173,20 @@ export default function MobilePad({
               {u}分
             </option>
           ))}
+          <option value="other">他</option>
         </select>
+        {customOpen && (
+          <input
+            className="pad-unit-custom"
+            type="number"
+            min={2}
+            max={128}
+            value={customText}
+            title="入力単位（2〜128）"
+            onChange={(e) => applyCustom(e.target.value)}
+            onBlur={commitCustom}
+          />
+        )}
         <button type="button" className="pad-btn" disabled={!canUndo} title="元に戻す" onPointerDown={press(onUndo)}>
           ↩
         </button>
