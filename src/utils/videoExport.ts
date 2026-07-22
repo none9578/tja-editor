@@ -175,6 +175,11 @@ async function encodeDeterministic(
       video: { codec: 'avc', width, height },
       audio: { codec: 'aac', numberOfChannels: 2, sampleRate: SAMPLE_RATE },
       fastStart: 'in-memory',
+      // 既定の'strict'だと、AACエンコーダの先頭チャンクのタイムスタンプが厳密に0でない場合に
+      // addAudioChunkが例外を投げ、その例外がエンコーダのコールバック内で握り潰されて
+      // 「映像はあるのに音声トラックだけ落ちる（＝mp4が無音）」状態になる。webm側と同じく
+      // 'offset'にして先頭を0起点に補正する。
+      firstTimestampBehavior: 'offset',
     });
   } else {
     const mod: Any = await import('webm-muxer');
@@ -187,11 +192,22 @@ async function encodeDeterministic(
     });
   }
 
+  // エンコーダ／ムクサのエラーはコールバック内で throw しても握り潰されるので、
+  // 変数に控えておき flush 後に判定する（無音のまま完了してしまうのを防ぐ）
+  let encodeError: unknown = null;
+  const fail = (e: unknown) => {
+    if (!encodeError) encodeError = e;
+  };
+
   const videoEncoder = new G.VideoEncoder({
-    output: (chunk: Any, meta: Any) => muxer.addVideoChunk(chunk, meta),
-    error: (e: Any) => {
-      throw e;
+    output: (chunk: Any, meta: Any) => {
+      try {
+        muxer.addVideoChunk(chunk, meta);
+      } catch (e) {
+        fail(e);
+      }
     },
+    error: fail,
   });
   videoEncoder.configure({
     codec: pick.vcodec,
@@ -203,10 +219,14 @@ async function encodeDeterministic(
   });
 
   const audioEncoder = new G.AudioEncoder({
-    output: (chunk: Any, meta: Any) => muxer.addAudioChunk(chunk, meta),
-    error: (e: Any) => {
-      throw e;
+    output: (chunk: Any, meta: Any) => {
+      try {
+        muxer.addAudioChunk(chunk, meta);
+      } catch (e) {
+        fail(e);
+      }
     },
+    error: fail,
   });
   audioEncoder.configure({
     codec: pick.acodec,
@@ -257,11 +277,16 @@ async function encodeDeterministic(
     });
     audioEncoder.encode(ad);
     ad.close();
+    // エンコードキューが詰まりすぎると端末によっては失敗するので適宜譲る
+    if ((off / block) % 32 === 0 && audioEncoder.encodeQueueSize > 32) {
+      while (audioEncoder.encodeQueueSize > 8) await new Promise((r) => setTimeout(r, 2));
+    }
   }
 
   opts.onProgress?.(0.96);
   await videoEncoder.flush();
   await audioEncoder.flush();
+  if (encodeError) throw encodeError instanceof Error ? encodeError : new Error(String(encodeError));
   muxer.finalize();
   opts.onProgress?.(1);
   const blob = new Blob([target.buffer], {
@@ -421,7 +446,14 @@ export async function exportPlayVideo(
     }
   };
 
-  const deterministic = await encodeDeterministic(opts, startNow, endNow, renderCanvas, renderAt);
-  if (deterministic) return deterministic;
+  // 決定論エンコードを試す。コーデック非対応(null)や途中のエンコード失敗時は、
+  // 音声が確実に入る実時間録画にフォールバックする（無音のまま書き出さない）。
+  try {
+    const deterministic = await encodeDeterministic(opts, startNow, endNow, renderCanvas, renderAt);
+    if (deterministic) return deterministic;
+  } catch (e) {
+    console.warn('決定論エンコードに失敗したため実時間録画に切り替えます:', e);
+    opts.onProgress?.(0);
+  }
   return await recordRealtime(opts, startNow, endNow, renderCanvas, renderAt);
 }

@@ -46,16 +46,21 @@ export default function ExportPanel({
   const jsonInputRef = useRef<HTMLInputElement>(null);
 
   const measureCount = project.measures.length;
-  const [vidFrom, setVidFrom] = useState(1);
-  const [vidTo, setVidTo] = useState(measureCount);
+  // 数値ではなく文字列で保持する。数値stateだと「0」を「16」に打ち替えるとき
+  // 一度「016」にしてから先頭の0を消す必要があり面倒なため（コピーメニューと同じ方針）。
+  const [vidFrom, setVidFrom] = useState('1');
+  const [vidTo, setVidTo] = useState(String(measureCount));
   const [vidSize, setVidSize] = useState<keyof typeof VIDEO_SIZES>('m');
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const previewRef = useRef<HTMLDivElement>(null);
 
   // 選んだ範囲＋助走＋余韻の合計時間（＝おおよその書き出し時間）
-  const rangeA = Math.max(1, Math.min(vidFrom, measureCount));
-  const rangeB = Math.max(rangeA, Math.min(vidTo, measureCount));
+  // 空欄や不正値は1扱いにフォールバックしてクランプする
+  const numFrom = Number.parseInt(vidFrom, 10) || 1;
+  const numTo = Number.parseInt(vidTo, 10) || 1;
+  const rangeA = Math.max(1, Math.min(numFrom, measureCount));
+  const rangeB = Math.max(rangeA, Math.min(numTo, measureCount));
   const leadIn = timings.length > 0 ? Math.min(3, Math.max(1.5, timings[rangeA - 1].duration)) : 1.5;
   const outro = timings.length > 0 ? Math.min(3, Math.max(1.5, timings[rangeB - 1].duration)) : 1.5;
   const estSec =
@@ -256,7 +261,7 @@ export default function ExportPanel({
               max={measureCount}
               value={vidFrom}
               disabled={exporting}
-              onChange={(e) => setVidFrom(Number(e.target.value))}
+              onChange={(e) => setVidFrom(e.target.value)}
             />
             〜
             <input
@@ -265,7 +270,7 @@ export default function ExportPanel({
               max={measureCount}
               value={vidTo}
               disabled={exporting}
-              onChange={(e) => setVidTo(Number(e.target.value))}
+              onChange={(e) => setVidTo(e.target.value)}
             />
           </label>
           <label className="inline">
