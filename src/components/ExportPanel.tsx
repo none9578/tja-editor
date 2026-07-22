@@ -291,7 +291,7 @@ export default function ExportPanel({
             {exporting ? `書き出し中… ${Math.round(progress * 100)}%` : '🎬 動画を書き出し'}
           </button>
           {!exporting && (
-            <span className="video-export-est">予想時間: 約 {fmtSec(estSec)}</span>
+            <span className="video-export-est">動画の長さ: 約 {fmtSec(estSec)}</span>
           )}
         </div>
 
@@ -304,17 +304,15 @@ export default function ExportPanel({
               <div className="video-export-bar">
                 <div className="video-export-bar-fill" style={{ width: `${progress * 100}%` }} />
               </div>
-              <span>
-                {Math.round(progress * 100)}% ・ 残り 約 {fmtSec(estSec * (1 - progress))}
-              </span>
+              <span>{Math.round(progress * 100)}% 完了</span>
             </div>
           )}
         </div>
 
         <p className="video-export-hint">
-          16:9・音声込みで書き出します（曲は読み込んでいれば一緒に録音）。録画は実時間で進むため、
-          指定した小節ぶんの再生時間がかかります。書き出し中は下にオート再生が流れます。
-          このタブを開いたままにしてください。
+          16:9・音声込みで書き出します（曲は読み込んでいれば一緒にミックスされます）。
+          1フレームずつ描き出す方式なので、再生時間より短く済むことが多く、動きも滑らかです。
+          書き出し中は下にプレビューが流れます。このタブを開いたままにしてください。
         </p>
       </div>
       {courseChoices && (

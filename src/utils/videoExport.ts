@@ -109,46 +109,38 @@ async function renderAudioOffline(
   return await octx.startRendering();
 }
 
-/** WebCodecs で使えるコーデック構成を選ぶ（mp4/H264+AAC 優先、次に webm/VP9+Opus） */
-async function pickCodec(
+/**
+ * 出力コンテナとコーデックを選ぶ。mp4(H264+AAC)優先、非対応ならwebm(VP9/VP8+Opus)。
+ * mediabunny の getFirstEncodable* で実際にエンコード可能かを問い合わせる。
+ */
+async function pickOutput(
+  mb: Any,
   width: number,
   height: number,
   bitrate: number,
-  fps: number,
 ): Promise<null | { container: 'mp4' | 'webm'; vcodec: string; acodec: string; ext: string }> {
-  if (
-    typeof G.VideoEncoder === 'undefined' ||
-    typeof G.AudioEncoder === 'undefined' ||
-    typeof G.VideoFrame === 'undefined' ||
-    typeof G.AudioData === 'undefined'
-  ) {
-    return null;
-  }
-  const vOk = async (codec: string) =>
-    (await G.VideoEncoder.isConfigSupported({ codec, width, height, bitrate, framerate: fps }).catch(
-      () => null,
-    ))?.supported === true;
-  const aOk = async (codec: string) =>
-    (await G.AudioEncoder.isConfigSupported({
-      codec,
-      sampleRate: SAMPLE_RATE,
-      numberOfChannels: 2,
-      bitrate: AUDIO_BITRATE,
-    }).catch(() => null))?.supported === true;
-
-  if ((await vOk('avc1.42001f')) && (await aOk('mp4a.40.2'))) {
-    return { container: 'mp4', vcodec: 'avc1.42001f', acodec: 'mp4a.40.2', ext: 'mp4' };
-  }
-  if ((await aOk('opus')) && (await vOk('vp09.00.10.08'))) {
-    return { container: 'webm', vcodec: 'vp09.00.10.08', acodec: 'opus', ext: 'webm' };
-  }
-  if ((await aOk('opus')) && (await vOk('vp8'))) {
-    return { container: 'webm', vcodec: 'vp8', acodec: 'opus', ext: 'webm' };
-  }
+  if (typeof G.VideoEncoder === 'undefined' || typeof G.AudioEncoder === 'undefined') return null;
+  const vOpts = { width, height, bitrate };
+  const aOpts = { numberOfChannels: 2, sampleRate: SAMPLE_RATE, bitrate: AUDIO_BITRATE };
+  // mp4: H264 + AAC
+  const avc = await mb.getFirstEncodableVideoCodec(['avc'], vOpts);
+  const aac = await mb.getFirstEncodableAudioCodec(['aac'], aOpts);
+  if (avc && aac) return { container: 'mp4', vcodec: avc, acodec: aac, ext: 'mp4' };
+  // webm: VP9/VP8 + Opus
+  const vpx = await mb.getFirstEncodableVideoCodec(['vp9', 'vp8'], vOpts);
+  const opus = await mb.getFirstEncodableAudioCodec(['opus'], aOpts);
+  if (vpx && opus) return { container: 'webm', vcodec: vpx, acodec: opus, ext: 'webm' };
   return null;
 }
 
-/** WebCodecsで決定論的にエンコードする。非対応ならnullを返す */
+/**
+ * mediabunny で決定論的にエンコードする。非対応ならnullを返す。
+ *
+ * mediabunny は WebCodecs のエンコーダ生成・バックプレッシャ・多重化を内部で正しく面倒みるので、
+ * 自前で mp4-muxer/webm-muxer を叩いていた頃に起きた「mp4のAAC音声トラックだけ無音になる」不具合を回避できる。
+ * 映像は CanvasSource（各フレームを指定タイムスタンプでキャプチャ）、音声は OfflineAudioContext で
+ * 先に理論ミックスした AudioBuffer を AudioBufferSource でまるごと符号化する。
+ */
 async function encodeDeterministic(
   opts: ExportOptions,
   startNow: number,
@@ -159,137 +151,60 @@ async function encodeDeterministic(
   const { width, height } = opts;
   const fps = opts.fps ?? 60;
   const bitrate = opts.bitrate ?? 6_000_000;
-  const pick = await pickCodec(width, height, bitrate, fps);
+
+  const mb: Any = await import('mediabunny');
+  const pick = await pickOutput(mb, width, height, bitrate);
   if (!pick) return null;
 
   const audioBuf = await renderAudioOffline(opts, startNow, endNow);
 
-  // ムクサ（コンテナ）を用意
-  let muxer: Any;
-  let target: Any;
-  if (pick.container === 'mp4') {
-    const mod: Any = await import('mp4-muxer');
-    target = new mod.ArrayBufferTarget();
-    muxer = new mod.Muxer({
-      target,
-      video: { codec: 'avc', width, height },
-      audio: { codec: 'aac', numberOfChannels: 2, sampleRate: SAMPLE_RATE },
-      fastStart: 'in-memory',
-      // 既定の'strict'だと、AACエンコーダの先頭チャンクのタイムスタンプが厳密に0でない場合に
-      // addAudioChunkが例外を投げ、その例外がエンコーダのコールバック内で握り潰されて
-      // 「映像はあるのに音声トラックだけ落ちる（＝mp4が無音）」状態になる。webm側と同じく
-      // 'offset'にして先頭を0起点に補正する。
-      firstTimestampBehavior: 'offset',
-    });
-  } else {
-    const mod: Any = await import('webm-muxer');
-    target = new mod.ArrayBufferTarget();
-    muxer = new mod.Muxer({
-      target,
-      video: { codec: pick.vcodec.startsWith('vp09') ? 'V_VP9' : 'V_VP8', width, height, frameRate: fps },
-      audio: { codec: 'A_OPUS', numberOfChannels: 2, sampleRate: SAMPLE_RATE },
-      firstTimestampBehavior: 'offset',
-    });
-  }
-
-  // エンコーダ／ムクサのエラーはコールバック内で throw しても握り潰されるので、
-  // 変数に控えておき flush 後に判定する（無音のまま完了してしまうのを防ぐ）
-  let encodeError: unknown = null;
-  const fail = (e: unknown) => {
-    if (!encodeError) encodeError = e;
-  };
-
-  const videoEncoder = new G.VideoEncoder({
-    output: (chunk: Any, meta: Any) => {
-      try {
-        muxer.addVideoChunk(chunk, meta);
-      } catch (e) {
-        fail(e);
-      }
-    },
-    error: fail,
+  const output = new mb.Output({
+    format:
+      pick.container === 'mp4'
+        ? new mb.Mp4OutputFormat({ fastStart: 'in-memory' })
+        : new mb.WebMOutputFormat(),
+    target: new mb.BufferTarget(),
   });
-  videoEncoder.configure({
+
+  const videoSource = new mb.CanvasSource(renderCanvas, {
     codec: pick.vcodec,
-    width,
-    height,
     bitrate,
-    framerate: fps,
-    ...(pick.container === 'mp4' ? { avc: { format: 'avc' } } : {}),
+    keyFrameInterval: 2,
   });
+  output.addVideoTrack(videoSource, { frameRate: fps });
 
-  const audioEncoder = new G.AudioEncoder({
-    output: (chunk: Any, meta: Any) => {
-      try {
-        muxer.addAudioChunk(chunk, meta);
-      } catch (e) {
-        fail(e);
-      }
-    },
-    error: fail,
-  });
-  audioEncoder.configure({
+  const audioSource = new mb.AudioBufferSource({
     codec: pick.acodec,
-    sampleRate: SAMPLE_RATE,
-    numberOfChannels: 2,
     bitrate: AUDIO_BITRATE,
   });
+  output.addAudioTrack(audioSource);
 
-  // ---- 映像フレームを1枚ずつ符号化 ----
+  await output.start();
+
+  // ---- 映像フレームを1枚ずつキャプチャ＆符号化（各addのPromiseを待ってバックプレッシャを尊重）----
   const total = endNow - startNow;
   const frameCount = Math.max(1, Math.round(total * fps));
-  const frameDur = 1e6 / fps; // マイクロ秒
+  const frameDur = 1 / fps;
   for (let i = 0; i < frameCount; i++) {
     const now = startNow + i / fps;
     renderAt(now);
-    const frame = new G.VideoFrame(renderCanvas, {
-      timestamp: Math.round(i * frameDur),
-      duration: Math.round(frameDur),
-    });
-    videoEncoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
-    frame.close();
+    await videoSource.add(i / fps, frameDur);
     if (i % 6 === 0) {
-      opts.onProgress?.((i / frameCount) * 0.92);
-      // エンコードキューが詰まりすぎないよう、また画面を更新できるよう譲る
-      while (videoEncoder.encodeQueueSize > 20) await new Promise((r) => setTimeout(r, 2));
-      await new Promise((r) => setTimeout(r, 0));
+      opts.onProgress?.((i / frameCount) * 0.9);
+      await new Promise((r) => setTimeout(r, 0)); // 画面更新のため譲る
     }
   }
 
-  // ---- 音声を符号化 ----
-  const chans = Math.min(2, audioBuf.numberOfChannels);
-  const len = audioBuf.length;
-  const ch0 = audioBuf.getChannelData(0);
-  const ch1 = chans > 1 ? audioBuf.getChannelData(1) : ch0;
-  const block = 2048;
-  for (let off = 0; off < len; off += block) {
-    const n = Math.min(block, len - off);
-    const planar = new Float32Array(n * 2);
-    planar.set(ch0.subarray(off, off + n), 0);
-    planar.set(ch1.subarray(off, off + n), n);
-    const ad = new G.AudioData({
-      format: 'f32-planar',
-      sampleRate: SAMPLE_RATE,
-      numberOfFrames: n,
-      numberOfChannels: 2,
-      timestamp: Math.round((off / SAMPLE_RATE) * 1e6),
-      data: planar,
-    });
-    audioEncoder.encode(ad);
-    ad.close();
-    // エンコードキューが詰まりすぎると端末によっては失敗するので適宜譲る
-    if ((off / block) % 32 === 0 && audioEncoder.encodeQueueSize > 32) {
-      while (audioEncoder.encodeQueueSize > 8) await new Promise((r) => setTimeout(r, 2));
-    }
-  }
+  // ---- 音声（ミックス済みバッファをまるごと）----
+  opts.onProgress?.(0.94);
+  await audioSource.add(audioBuf);
 
-  opts.onProgress?.(0.96);
-  await videoEncoder.flush();
-  await audioEncoder.flush();
-  if (encodeError) throw encodeError instanceof Error ? encodeError : new Error(String(encodeError));
-  muxer.finalize();
+  opts.onProgress?.(0.97);
+  await output.finalize();
   opts.onProgress?.(1);
-  const blob = new Blob([target.buffer], {
+
+  const buffer = output.target.buffer as ArrayBuffer;
+  const blob = new Blob([buffer], {
     type: pick.container === 'mp4' ? 'video/mp4' : 'video/webm',
   });
   return { blob, ext: pick.ext };
