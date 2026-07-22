@@ -1022,10 +1022,14 @@ export default function App() {
             <h2>エクスポート / インポート</h2>
             <ExportPanel
               project={project}
+              timings={timings}
+              rollSpans={rollSpans}
+              events={autoEvents}
               onImport={handleImport}
               onLoadJson={handleImport}
               getAudioFile={() => playerRef.current.getAudioFile()}
               onLoadAudio={(f) => playerRef.current.loadAudioFile(f)}
+              getExportAudio={() => playerRef.current.getExportAudio()}
             />
           </section>
 

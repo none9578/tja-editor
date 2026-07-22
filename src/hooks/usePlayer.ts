@@ -291,6 +291,18 @@ export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: num
   }, []);
 
   /** パレットのボタン押下などで単発のヒット音を鳴らす */
+  /** 動画出力用: デコード済みバッファ・音源・各設定を取り出す */
+  const getExportAudio = useCallback(
+    () => ({
+      buffers: buffersRef.current,
+      music: musicBufRef.current,
+      offset: offsetRef.current,
+      hitSoundOn: hitOnRef.current,
+      musicVolume: musicVolRef.current,
+    }),
+    [],
+  );
+
   const preview = useCallback(
     (type: HitType) => {
       const ctx = ensureCtx();
@@ -335,6 +347,7 @@ export function usePlayer(offset: number, noteEvents: NoteEvent[], chartEnd: num
     seek,
     loadAudioFile,
     getAudioFile,
+    getExportAudio,
     preview,
   };
 }

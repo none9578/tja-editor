@@ -1478,6 +1478,31 @@ label.inline {
   margin-bottom: 10px;
 }
 
+/* オート再生の動画出力 */
+.video-export {
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.video-export h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+.video-export-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.video-export-row input[type='number'] {
+  width: 60px;
+}
+.video-export-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 8px 0 0;
+}
+
 .course-chooser {
   border: 1px solid var(--accent);
   border-radius: 8px;

@@ -1,30 +1,91 @@
 import { useRef, useState } from 'react';
 import { Project } from '../types';
+import { MeasureTiming } from '../utils/timing';
+import { RollSpan } from '../utils/rolls';
+import { NoteEvent } from '../hooks/usePlayer';
 import { downloadBlob, generateTja, parseTja } from '../utils/tja';
 import { makeZip } from '../utils/zip';
 import { fileBaseName, ProjectFile, saveProjectJson } from '../utils/projectFile';
+import { buildPlayData } from '../utils/playRender';
+import { ExportAudio, exportPlayVideo } from '../utils/videoExport';
+
+const VIDEO_SIZES = {
+  s: { label: '小 (854×480)', w: 854, h: 480, bitrate: 2_500_000 },
+  m: { label: '中 (1280×720)', w: 1280, h: 720, bitrate: 5_000_000 },
+  l: { label: '大 (1920×1080)', w: 1920, h: 1080, bitrate: 9_000_000 },
+} as const;
 
 interface Props {
   project: Project;
+  timings: MeasureTiming[];
+  rollSpans: RollSpan[];
+  events: NoteEvent[];
   onImport: (project: Project, warnings: string[]) => void;
   onLoadJson: (project: Project) => void;
   /** 読み込み済み音源の元ファイル（未読み込みならnull） */
   getAudioFile: () => File | null;
   onLoadAudio: (file: File) => void;
+  getExportAudio: () => ExportAudio;
 }
 
 export default function ExportPanel({
   project,
+  timings,
+  rollSpans,
+  events,
   onImport,
   onLoadJson,
   getAudioFile,
   onLoadAudio,
+  getExportAudio,
 }: Props) {
   const [preview, setPreview] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
   const [courseChoices, setCourseChoices] = useState<Project[] | null>(null);
   const tjaInputRef = useRef<HTMLInputElement>(null);
   const jsonInputRef = useRef<HTMLInputElement>(null);
+
+  const measureCount = project.measures.length;
+  const [vidFrom, setVidFrom] = useState(1);
+  const [vidTo, setVidTo] = useState(measureCount);
+  const [vidSize, setVidSize] = useState<keyof typeof VIDEO_SIZES>('m');
+  const [exporting, setExporting] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const exportVideo = async () => {
+    const a = Math.max(1, Math.min(vidFrom, measureCount));
+    const b = Math.max(a, Math.min(vidTo, measureCount));
+    const fromTime = timings[a - 1].startTime;
+    const toTime = timings[b - 1].startTime + timings[b - 1].duration;
+    const size = VIDEO_SIZES[vidSize];
+    setExporting(true);
+    setProgress(0);
+    setWarnings([]);
+    try {
+      const data = buildPlayData(project, timings, rollSpans, events);
+      const { blob, ext } = await exportPlayVideo({
+        data,
+        events,
+        audio: getExportAudio(),
+        fromTime,
+        toTime,
+        width: size.w,
+        height: size.h,
+        bitrate: size.bitrate,
+        onProgress: setProgress,
+      });
+      downloadBlob(blob, `${fileBaseName(project)}_${a}-${b}.${ext}`);
+      if (ext === 'webm') {
+        setWarnings([
+          'このブラウザはmp4録画に非対応のためwebmで書き出しました（YouTubeはそのまま投稿できます）。',
+        ]);
+      }
+    } catch (e) {
+      setWarnings([`動画の書き出しに失敗しました: ${e instanceof Error ? e.message : String(e)}`]);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const refresh = () => setPreview(generateTja(project));
 
@@ -152,6 +213,54 @@ export default function ExportPanel({
             e.target.value = '';
           }}
         />
+      </div>
+
+      {/* オート再生の動画出力（16:9・音声込み） */}
+      <div className="video-export">
+        <h3>オート再生の動画を書き出し</h3>
+        <div className="video-export-row">
+          <label className="inline">
+            小節
+            <input
+              type="number"
+              min={1}
+              max={measureCount}
+              value={vidFrom}
+              disabled={exporting}
+              onChange={(e) => setVidFrom(Number(e.target.value))}
+            />
+            〜
+            <input
+              type="number"
+              min={1}
+              max={measureCount}
+              value={vidTo}
+              disabled={exporting}
+              onChange={(e) => setVidTo(Number(e.target.value))}
+            />
+          </label>
+          <label className="inline">
+            サイズ
+            <select
+              value={vidSize}
+              disabled={exporting}
+              onChange={(e) => setVidSize(e.target.value as keyof typeof VIDEO_SIZES)}
+            >
+              {Object.entries(VIDEO_SIZES).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="primary" disabled={exporting} onClick={() => void exportVideo()}>
+            {exporting ? `書き出し中… ${Math.round(progress * 100)}%` : '🎬 動画を書き出し'}
+          </button>
+        </div>
+        <p className="video-export-hint">
+          16:9・音声込みで書き出します（曲は読み込んでいれば一緒に録音）。録画は実時間で進むため、
+          指定した小節ぶんの再生時間がかかります。書き出し中はこのタブを開いたままにしてください。
+        </p>
       </div>
       {courseChoices && (
         <div className="course-chooser">
