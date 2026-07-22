@@ -51,12 +51,23 @@ export default function ExportPanel({
   const [vidSize, setVidSize] = useState<keyof typeof VIDEO_SIZES>('m');
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  // 選んだ範囲の再生時間（＝おおよその書き出し時間）
+  const rangeA = Math.max(1, Math.min(vidFrom, measureCount));
+  const rangeB = Math.max(rangeA, Math.min(vidTo, measureCount));
+  const estSec =
+    timings.length > 0
+      ? timings[rangeB - 1].startTime + timings[rangeB - 1].duration - timings[rangeA - 1].startTime
+      : 0;
+  const fmtSec = (s: number) => {
+    const n = Math.max(0, Math.ceil(s));
+    return n >= 60 ? `${Math.floor(n / 60)}分${String(n % 60).padStart(2, '0')}秒` : `${n}秒`;
+  };
 
   const exportVideo = async () => {
-    const a = Math.max(1, Math.min(vidFrom, measureCount));
-    const b = Math.max(a, Math.min(vidTo, measureCount));
-    const fromTime = timings[a - 1].startTime;
-    const toTime = timings[b - 1].startTime + timings[b - 1].duration;
+    const fromTime = timings[rangeA - 1].startTime;
+    const toTime = timings[rangeB - 1].startTime + timings[rangeB - 1].duration;
     const size = VIDEO_SIZES[vidSize];
     setExporting(true);
     setProgress(0);
@@ -73,8 +84,17 @@ export default function ExportPanel({
         height: size.h,
         bitrate: size.bitrate,
         onProgress: setProgress,
+        onCanvas: (cv) => {
+          const box = previewRef.current;
+          if (!box) return;
+          box.innerHTML = '';
+          cv.style.width = '100%';
+          cv.style.height = 'auto';
+          cv.style.display = 'block';
+          box.appendChild(cv);
+        },
       });
-      downloadBlob(blob, `${fileBaseName(project)}_${a}-${b}.${ext}`);
+      downloadBlob(blob, `${fileBaseName(project)}_${rangeA}-${rangeB}.${ext}`);
       if (ext === 'webm') {
         setWarnings([
           'このブラウザはmp4録画に非対応のためwebmで書き出しました（YouTubeはそのまま投稿できます）。',
@@ -84,6 +104,7 @@ export default function ExportPanel({
       setWarnings([`動画の書き出しに失敗しました: ${e instanceof Error ? e.message : String(e)}`]);
     } finally {
       setExporting(false);
+      if (previewRef.current) previewRef.current.innerHTML = '';
     }
   };
 
@@ -256,10 +277,31 @@ export default function ExportPanel({
           <button type="button" className="primary" disabled={exporting} onClick={() => void exportVideo()}>
             {exporting ? `書き出し中… ${Math.round(progress * 100)}%` : '🎬 動画を書き出し'}
           </button>
+          {!exporting && (
+            <span className="video-export-est">予想時間: 約 {fmtSec(estSec)}</span>
+          )}
         </div>
+
+        {/* プレビュー領域は常時DOMに置く（録画開始直後に canvas を差し込むため）。
+            非表示は exporting クラスで切り替える */}
+        <div className={`video-export-live ${exporting ? 'active' : ''}`}>
+          <div className="video-export-preview" ref={previewRef} />
+          {exporting && (
+            <div className="video-export-progress">
+              <div className="video-export-bar">
+                <div className="video-export-bar-fill" style={{ width: `${progress * 100}%` }} />
+              </div>
+              <span>
+                {Math.round(progress * 100)}% ・ 残り 約 {fmtSec(estSec * (1 - progress))}
+              </span>
+            </div>
+          )}
+        </div>
+
         <p className="video-export-hint">
           16:9・音声込みで書き出します（曲は読み込んでいれば一緒に録音）。録画は実時間で進むため、
-          指定した小節ぶんの再生時間がかかります。書き出し中はこのタブを開いたままにしてください。
+          指定した小節ぶんの再生時間がかかります。書き出し中は下にオート再生が流れます。
+          このタブを開いたままにしてください。
         </p>
       </div>
       {courseChoices && (

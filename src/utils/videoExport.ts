@@ -25,6 +25,10 @@ export interface ExportOptions {
   fps?: number;
   bitrate?: number;
   onProgress?: (ratio: number) => void;
+  /** 録画中のcanvasを画面に出す（ミニプレーヤー）用。生成直後に呼ばれる */
+  onCanvas?: (canvas: HTMLCanvasElement) => void;
+  /** 録画音声をスピーカーにも流して監視するか（既定true） */
+  monitor?: boolean;
 }
 
 /** 使えるコンテナ形式を選ぶ（mp4優先、非対応ならwebm） */
@@ -57,18 +61,24 @@ export async function exportPlayVideo(
   canvas.height = height;
   const ctx = canvas.getContext('2d')!;
   const layout = exportLayout(width, height);
+  opts.onCanvas?.(canvas); // ミニプレーヤーとして画面に出せるよう渡す
 
-  // 音声（曲＋太鼓音）をMediaStreamへ流す
+  // 音声（曲＋太鼓音）をMediaStreamへ流す（monitor時はスピーカーにも）
   const ac = new AudioContext();
   await ac.resume();
   const dest = ac.createMediaStreamDestination();
+  const monitor = opts.monitor !== false;
+  const sinkOf = (node: AudioNode) => {
+    node.connect(dest);
+    if (monitor) node.connect(ac.destination);
+  };
   const t0 = ac.currentTime + 0.25; // スケジューリング余裕
   const chartToAc = (chart: number) => t0 + (chart - fromTime);
 
   if (audio.music && audio.musicVolume > 0) {
     const g = ac.createGain();
     g.gain.value = audio.musicVolume;
-    g.connect(dest);
+    sinkOf(g);
     const src = ac.createBufferSource();
     src.buffer = audio.music;
     src.connect(g);
@@ -93,7 +103,8 @@ export async function exportPlayVideo(
       src.buffer = buf;
       const g = ac.createGain();
       g.gain.value = e.type === 'bigDon' || e.type === 'bigKa' ? 1.25 : 1;
-      src.connect(g).connect(dest);
+      src.connect(g);
+      sinkOf(g);
       src.start(chartToAc(e.time));
     }
   }
