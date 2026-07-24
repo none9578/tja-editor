@@ -14,6 +14,8 @@ import { getSections } from './sections';
 const NOTE_R = 21;
 const BIG_R = 30;
 const FLY_SEC = 0.5;
+/** 魂ゲージが満タンに達する位置（全音符に対する割合）。曲の約7割で最高潮になる演出 */
+const GAUGE_FULL_RATIO = 0.7;
 
 interface LaneNote {
   time: number;
@@ -385,7 +387,10 @@ export function renderPlayFrame(
   };
   const rollHits = countUpTo(data.rollHitTimes, now);
   const score = passed * data.noteBase + rollHits * 100;
-  const gauge = data.noteCount > 0 ? Math.min(1, passed / data.noteCount) : 0;
+  // 魂ゲージは「終盤が最高潮」の演出になるよう、全音符の約7割を叩いた時点で満タンに達し、
+  // 以降は満タンを保つ（全良で最後にちょうど100%だと上がりきるのが遅く感じるため）。
+  const gauge =
+    data.noteCount > 0 ? Math.min(1, passed / (data.noteCount * GAUGE_FULL_RATIO)) : 0;
   const cleared = gauge >= data.clearRatio - 1e-9;
   const scoreStr = String(score).padStart(7, '0');
 
