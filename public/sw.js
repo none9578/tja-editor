@@ -1,7 +1,7 @@
 /* シンプルなService Worker（ネットワーク優先＋キャッシュフォールバック）。
    ホーム画面に追加したアプリをオフラインでも開けるようにする。
    バージョンを上げると古いキャッシュは破棄される。 */
-const CACHE = 'tja-editor-v6';
+const CACHE = 'tja-editor-v7';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

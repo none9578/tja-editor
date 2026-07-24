@@ -497,7 +497,7 @@ function drawTitle(
   fs: number,
 ): void {
   // taiko(動画)は上端の右、bar(画面)は薄いバーの下・右
-  let size = hud === 'taiko' ? 36 * fs : 20;
+  let size = hud === 'taiko' ? 28 * fs : 17;
   const x = hud === 'taiko' ? W - 18 * fs : W - 12;
   const y = hud === 'taiko' ? 46 * fs : 52;
   const maxW = hud === 'taiko' ? W * 0.5 : W * 0.45;
