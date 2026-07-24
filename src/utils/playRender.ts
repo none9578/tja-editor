@@ -46,6 +46,8 @@ export interface PlayData {
   rollHitTimes: number[];
   /** 魂ゲージのクリアライン（0〜1）。難易度で変わる */
   clearRatio: number;
+  /** 曲名（右上に本家風に表示） */
+  title: string;
 }
 
 /** 描画時の各種サイズ（画面と動画で別々に決める） */
@@ -213,6 +215,7 @@ export function buildPlayData(
     noteBase,
     rollHitTimes,
     clearRatio: clearRatioForCourse(project.metadata.course),
+    title: (project.metadata.title || '').trim(),
   };
 }
 
@@ -408,6 +411,11 @@ export function renderPlayFrame(
     ctx.fillText(`${passed} コンボ`, W / 2, layout.hud === 'taiko' ? cy - bigR - 14 * fs : 62);
   }
 
+  // 曲名（本家のように右上）。動画は常時、画面表示はPC幅のときだけ（モバイルは出さない）
+  if (data.title && (layout.hud === 'taiko' || W >= 620)) {
+    drawTitle(ctx, W, data.title, layout.hud, fs);
+  }
+
   // 操作ガイド（画面表示のみ。動画では isPlaying=true にして出さない）
   if (!frame.isPlaying && frame.started) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
@@ -478,6 +486,33 @@ function drawSoulGauge(
   ctx.textBaseline = 'middle';
   ctx.fillText('魂', sx, sy + soulR * 0.06);
   ctx.textBaseline = 'alphabetic';
+}
+
+/** 曲名を右上に描く（点数表示より少し大きめ）。長い場合は幅に収まるよう縮小する */
+function drawTitle(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  title: string,
+  hud: 'bar' | 'taiko',
+  fs: number,
+): void {
+  // taiko(動画)は上端の右、bar(画面)は薄いバーの下・右
+  let size = hud === 'taiko' ? 36 * fs : 20;
+  const x = hud === 'taiko' ? W - 18 * fs : W - 12;
+  const y = hud === 'taiko' ? 46 * fs : 52;
+  const maxW = hud === 'taiko' ? W * 0.5 : W * 0.45;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `bold ${size}px sans-serif`;
+  const w = ctx.measureText(title).width;
+  if (w > maxW) {
+    size = (size * maxW) / w;
+    ctx.font = `bold ${size}px sans-serif`;
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillText(title, x + 1.5 * fs, y + 1.5 * fs);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(title, x, y);
 }
 
 /** 本家配置のHUD（動画出力）: 点数は判定枠付近のレーン上、魂ゲージはレーン上に右寄せ */
